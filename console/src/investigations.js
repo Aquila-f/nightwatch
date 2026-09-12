@@ -18,6 +18,171 @@ let lastActivity = 0, lastLogActivity = 0, disposed = false, graphGeneration = 0
 let history = [], nextBefore = null, historyBusy = false, historyAgain = false, selectedHistory = null, detailGeneration = 0, filter = 'all';
 let journalFilter = 'all', posting = false, pendingRequest = null, refreshBusy = false;
 const storageKey = 'nightwatch.investigation.pending.v1';
+const localTime = value => Number.isFinite(typeof value === 'number' ? value : Date.parse(value)) ? new Intl.DateTimeFormat('zh-TW', {timeZone: 'Asia/Taipei', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'}).format(new Date(value)) : '—';
+const nodeSlots = new Map();
+let liveGraph = null, liveReceivedAt = null, viewingHistory = false;
+let snapshots = [], timelineBounds = null, cursorTime = null, targetSnapshot = null;
+let snapshotBusy = false, snapshotMessage = '', snapshotIndexError = '', snapshotIndexBusy = false;
+let snapshotController = null, snapshotIndexController = null, snapshotRequest = 0, snapshotTimer = null, snapshotPoll = null, lastSnapshotRequest = 0;
+
+function updateGraphMarkup(id, markup) {
+  const container = $(id), range = document.createRange();
+  range.selectNodeContents(container);
+  const fragment = range.createContextualFragment(markup);
+  const key = node => node.nodeType === 1 ? node.getAttribute('data-node') ?? node.getAttribute('data-snapshot') : null;
+  function sync(parent, desired) {
+    const keyed = new Map([...parent.childNodes].filter(node => key(node) !== null).map(node => [key(node), node]));
+    let cursor = parent.firstChild;
+    for (const next of [...desired.childNodes]) {
+      const nextKey = key(next);
+      let current = nextKey === null ? cursor : keyed.get(nextKey);
+      if (!current || key(current) !== nextKey || current.nodeType !== next.nodeType || current.nodeName !== next.nodeName || current.namespaceURI !== next.namespaceURI) {
+        current = next.cloneNode(true);
+        parent.insertBefore(current, cursor);
+      } else {
+        if (current !== cursor) parent.insertBefore(current, cursor);
+        if (current.nodeType === 1) {
+          // Keep a user's expanded node details open across observation updates.
+          const keepOpen = current.localName === 'details';
+          for (const attribute of [...current.attributes]) {
+            if (!(keepOpen && attribute.name === 'open') && !next.hasAttribute(attribute.name)) current.removeAttribute(attribute.name);
+          }
+          for (const attribute of [...next.attributes]) {
+            if (!(keepOpen && attribute.name === 'open') && current.getAttribute(attribute.name) !== attribute.value) current.setAttribute(attribute.name, attribute.value);
+          }
+          sync(current, next);
+        } else if (current.nodeValue !== next.nodeValue) current.nodeValue = next.nodeValue;
+      }
+      cursor = current.nextSibling;
+    }
+    while (cursor) { const next = cursor.nextSibling; cursor.remove(); cursor = next; }
+  }
+  sync(container, fragment);
+}
+
+function timelineItems() {
+  return snapshots.filter(item => !timelineBounds || (item.time >= timelineBounds.from && item.time <= timelineBounds.to));
+}
+function renderTimeline() {
+  updateStartButton();
+  const items = timelineItems(), range = $('snapshot-range');
+  $('graph-mode').textContent = snapshotBusy ? '歷史快照載入中' : viewingHistory ? '歷史 graph' : '即時 graph';
+  $('graph-live').disabled = !viewingHistory;
+  $('graph-view-time').textContent = graph ? `${snapshotBusy ? '目前顯示' : viewingHistory ? '歷史快照' : '即時觀測'} ${localTime(graph.at)} (+08:00) · #${graph.seq}` : snapshotBusy ? '正在讀取歷史快照…' : '目前沒有可顯示的快照';
+  $('graph-canvas').setAttribute('aria-busy', String(snapshotBusy));
+  const index = items.findIndex(item => item.seq === targetSnapshot?.seq);
+  $('snapshot-prev').disabled = !items.length || (viewingHistory && index === 0);
+  $('snapshot-next').disabled = !viewingHistory || !items.length || index === items.length - 1;
+  range.disabled = !items.length;
+  if (timelineBounds) {
+    // Keep native slider values small enough for accessibility APIs' numeric precision.
+    range.min = 0; range.max = Math.max(1, timelineBounds.to - timelineBounds.from);
+    range.value = (viewingHistory ? cursorTime ?? timelineBounds.to : timelineBounds.to) - timelineBounds.from;
+    $('snapshot-from').textContent = `${localTime(timelineBounds.from)} ${viewingHistory ? '範圍起點' : '最早'}`;
+    $('snapshot-to').textContent = `${localTime(timelineBounds.to)} ${viewingHistory ? '範圍終點' : '最新保存'}`;
+    const span = timelineBounds.to - timelineBounds.from || 1;
+    updateGraphMarkup('snapshot-ticks', items.map(item => `<i data-snapshot="${item.seq}" style="left:${(item.time - timelineBounds.from) / span * 100}%"></i>`).join(''));
+  } else {
+    $('snapshot-from').textContent = $('snapshot-to').textContent = '—';
+    $('snapshot-ticks').textContent = '';
+  }
+  const label = viewingHistory ? `游標 ${localTime(cursorTime)}` : `${items.length} 張可用快照`;
+  $('snapshot-target').textContent = label;
+  range.setAttribute('aria-valuetext', `${label}${targetSnapshot ? `，快照 ${localTime(targetSnapshot.at)}` : ''}，台灣時間`);
+  $('snapshot-note').textContent = snapshotBusy ? `正在載入 ${localTime(targetSnapshot?.at)}；${graph ? `暫時保留 ${localTime(graph.at)} 的圖，完成後切換。` : '尚無可顯示的圖。'}` : !items.length ? '目前沒有保留快照；即時觀測仍可使用。' : viewingHistory ? `選取不晚於游標的快照；快照間沒有保存的狀態不補算。右側調查與 Monitor 紀錄仍為即時。` : '拖曳可查看歷史；最右端是最新保存快照。時間均為台灣時間 (+08:00)。';
+  $('snapshot-error').textContent = [snapshotIndexError, snapshotMessage].filter(Boolean).join(' ');
+  $('snapshot-error').hidden = !snapshotIndexError && !snapshotMessage;
+}
+function cancelSnapshot() {
+  clearTimeout(snapshotTimer); snapshotTimer = null;
+  snapshotController?.abort(); snapshotController = null; snapshotRequest++;
+}
+async function loadSnapshotIndex() {
+  if (snapshotIndexBusy || disposed) return;
+  snapshotIndexBusy = true;
+  const controller = new AbortController(); snapshotIndexController = controller;
+  try {
+    const all = new Map(); let before = null;
+    do {
+      const page = await requestJSON(`/api/graph/snapshots?limit=500${before === null ? '' : '&before_seq=' + before}`, {signal: controller.signal});
+      if (!Array.isArray(page.snapshots) || !(page.next_before_seq === null || Number.isSafeInteger(page.next_before_seq))) throw new Error('快照清單或分頁格式不符。');
+      let previous = before ?? Infinity;
+      for (const item of page.snapshots) {
+        if (!Number.isSafeInteger(item.seq) || item.seq < 0 || typeof item.at !== 'string' || !Number.isFinite(Date.parse(item.at)) || item.seq >= previous) throw new Error('快照索引缺少合法 seq、at 或未依序排列。');
+        all.set(item.seq, {...item, time: Date.parse(item.at)}); previous = item.seq;
+      }
+      if (page.next_before_seq !== null && (!page.snapshots.length || page.next_before_seq !== previous || page.next_before_seq >= (before ?? Infinity))) throw new Error('快照分頁沒有前進。');
+      before = page.next_before_seq;
+    } while (before !== null && !disposed);
+    if (disposed) return;
+    const ordered = [...all.values()].sort((a, b) => a.time - b.time || a.seq - b.seq);
+    // timestamp resolves equal times to the largest seq; expose only retrievable entries.
+    snapshots = [...new Map(ordered.map(item => [item.time, item])).values()];
+    snapshotIndexError = '';
+    if (!viewingHistory) timelineBounds = snapshots.length ? {from: snapshots[0].time, to: snapshots[snapshots.length - 1].time} : null;
+    if (viewingHistory && targetSnapshot && !all.has(targetSnapshot.seq)) {
+      cancelSnapshot(); snapshotBusy = false; graph = null;
+      snapshotMessage = '此快照已過期或不再可用。請選擇其他時間，或回到即時。';
+      targetSnapshot = null; renderGraph();
+    }
+  } catch (e) {
+    if (!controller.signal.aborted) snapshotIndexError = `歷史清單讀取失敗：${e.message}；按「更新資料」可重試。`;
+  } finally {
+    snapshotIndexBusy = false;
+    if (!disposed) renderTimeline();
+  }
+}
+function selectSnapshot(time, immediate = false) {
+  if (!Number.isFinite(time) || disposed) return;
+  const items = timelineItems();
+  const item = [...items].reverse().find(candidate => candidate.time <= time);
+  viewingHistory = true; cursorTime = time;
+  if (item && targetSnapshot?.seq === item.seq && !snapshotMessage && (snapshotBusy || graph?.seq === item.seq)) {
+    if (immediate && snapshotTimer) { clearTimeout(snapshotTimer); snapshotTimer = null; void fetchSnapshot(item, snapshotRequest); }
+    renderTimeline(); return;
+  }
+  cancelSnapshot(); targetSnapshot = item ?? null; snapshotMessage = '';
+  snapshotBusy = Boolean(item);
+  if (!item) { graph = null; snapshotMessage = '此時間沒有保留快照，請選擇較新的時間。'; }
+  renderGraph();
+  if (!item) return;
+  const request = snapshotRequest;
+  const delay = immediate ? 0 : Math.max(0, 150 - (Date.now() - lastSnapshotRequest));
+  snapshotTimer = setTimeout(() => { snapshotTimer = null; void fetchSnapshot(item, request); }, delay);
+}
+async function fetchSnapshot(item, request) {
+  lastSnapshotRequest = Date.now();
+  const controller = new AbortController(); snapshotController = controller;
+  try {
+    const params = new URLSearchParams({timestamp: item.at});
+    const value = await requestJSON(`/api/graph?${params}`, {signal: controller.signal});
+    validateObservation(value);
+    if (disposed || request !== snapshotRequest || !viewingHistory) return;
+    // A pruned snapshot may resolve to a different, earlier graph. Never relabel it.
+    if (Date.parse(value.at) !== item.time || value.seq !== item.seq) throw new Error('所選快照已改變或過期，請重新選擇時間。');
+    graph = value; graphReceivedAt = null; snapshotMessage = '';
+  } catch (e) {
+    if (disposed || controller.signal.aborted || request !== snapshotRequest) return;
+    graph = null;
+    snapshotMessage = e.status === 404 ? '此快照已過期或沒有可用資料。請選擇其他時間。' : `歷史快照讀取失敗：${e.message}`;
+    void loadSnapshotIndex();
+  } finally {
+    if (!disposed && request === snapshotRequest) { snapshotBusy = false; snapshotController = null; renderGraph(); }
+  }
+}
+function stepSnapshot(direction) {
+  const items = timelineItems();
+  if (!items.length) return;
+  const index = items.findIndex(item => item.seq === targetSnapshot?.seq);
+  const item = !viewingHistory ? items[items.length - 1] : index < 0 ? (direction < 0 ? [...items].reverse().find(item => item.time < cursorTime) : items.find(item => item.time > cursorTime)) : items[index + direction];
+  if (item) selectSnapshot(item.time, true);
+}
+function returnToLive() {
+  cancelSnapshot(); viewingHistory = false; snapshotBusy = false; snapshotMessage = ''; targetSnapshot = null; cursorTime = null;
+  graph = liveGraph; graphReceivedAt = liveReceivedAt;
+  timelineBounds = snapshots.length ? {from: snapshots[0].time, to: snapshots[snapshots.length - 1].time} : null;
+  renderGraph(); void loadSnapshotIndex(); void refresh();
+}
 
 function error(key, message) {
   if (message) errors.set(key, message); else errors.delete(key);
@@ -33,16 +198,15 @@ function activeId() { return store.state?.active_investigation_id ?? null; }
 function activeSummary() { return store.state?.active_investigation ?? null; }
 function updateStartButton() {
   $('start-investigation').disabled = posting || !store.state || Boolean(activeId());
-  $('start-investigation').textContent = posting ? '正在送出…' : pendingRequest ? '重試同一次調查' : '開始調查';
+  $('start-investigation').textContent = posting ? '正在送出…' : pendingRequest ? '重試同一次調查' : viewingHistory ? '調查即時狀態' : '開始調查';
 }
 function acceptGraph(value, receivedAt = null) {
   validateObservation(value);
   // Avoid a slow state GET rolling an independently delivered graph backwards.
-  if (graph && Date.parse(value.at) < Date.parse(graph.at)) return;
-  if (graph && value.at === graph.at && value.seq < graph.seq) return;
-  graph = value; graphReceivedAt = receivedAt; graphGeneration++;
-  if (!graph.nodes.some(n => n.id === selectedNode)) selectedNode = graph.nodes[0]?.id ?? null;
-  renderGraph();
+  if (liveGraph && Date.parse(value.at) < Date.parse(liveGraph.at)) return;
+  if (liveGraph && value.at === liveGraph.at && value.seq < liveGraph.seq) return;
+  liveGraph = value; liveReceivedAt = receivedAt; graphGeneration++;
+  if (!viewingHistory) { graph = value; graphReceivedAt = receivedAt; renderGraph(); }
 }
 function acceptState(value, options = {}) {
   const previous = activeId();
@@ -60,15 +224,25 @@ function acceptState(value, options = {}) {
 }
 
 function renderGraph() {
+  renderTimeline();
+  $('graph-canvas').hidden = !graph;
   $('active-phase').textContent = activeId() ? '調查中' : store.state ? '無進行中調查' : '等待狀態';
   if (!graph) {
-    $('graph-empty').hidden = false; $('graph-empty').textContent = '尚未取得服務拓樸。';
+    $('graph-empty').hidden = false; $('graph-empty').textContent = snapshotBusy ? '正在讀取歷史快照…' : '尚無可顯示的服務拓樸，請查看快照與連線訊息。';
+    $('nodes').textContent = ''; $('edges').innerHTML = ''; $('sources').textContent = '';
+    for (const id of ['total-nodes', 'failing-count', 'warning-count', 'snapshot-at']) $(id).textContent = '—';
+    $('graph-count').textContent = snapshotBusy ? '載入中' : '沒有快照'; $('match-count').textContent = '';
+    $('footer-status').textContent = viewingHistory ? '歷史模式 · 尚無可顯示的快照' : '等待即時快照';
+    renderNode();
     return;
   }
-  const layout = graphLayout(graph), signature = JSON.stringify(layout.map(n => n.id));
+  if (!graph.nodes.some(n => n.id === selectedNode)) selectedNode = graph.nodes[0]?.id ?? null;
+  for (const node of graphLayout(graph)) if (!nodeSlots.has(node.id)) nodeSlots.set(node.id, nodeSlots.size);
+  const layout = graph.nodes.map(node => { const slot = nodeSlots.get(node.id); return {id: node.id, layout: {row: Math.floor(slot / 4), col: slot % 4}}; });
+  const signature = String(nodeSlots.size);
   if (signature !== layoutSignature) { layoutSignature = signature; fit = true; }
-  const width = Math.min(4, Math.max(1, graph.nodes.length)) * 160 + 24;
-  const height = Math.max(1, Math.ceil(graph.nodes.length / 4)) * 150 + 24;
+  const width = Math.min(4, Math.max(1, nodeSlots.size)) * 160 + 24;
+  const height = Math.max(1, Math.ceil(nodeSlots.size / 4)) * 150 + 24;
   if (fit) zoom = Math.max(.5, Math.min(1.15, ($('graph-viewport').clientWidth - 16) / width));
   const positions = new Map(layout.map(n => [n.id, {x: 20 + n.layout.col * 160, y: 20 + n.layout.row * 150}]));
   const search = $('node-search').value.toLowerCase().trim(), selectedHealth = $('health-filter').value;
@@ -76,7 +250,7 @@ function renderGraph() {
   $('total-nodes').textContent = graph.nodes.length;
   $('failing-count').textContent = graph.nodes.filter(n => n.status === 'failing').length;
   $('warning-count').textContent = graph.nodes.filter(n => n.status === 'warning').length;
-  $('snapshot-at').textContent = at(graph.at);
+  $('snapshot-at').textContent = localTime(graph.at);
   $('graph-count').textContent = `${graph.nodes.length} 個節點 / ${graph.edges.length} 條連線`;
   $('match-count').textContent = `${matches.size} / ${graph.nodes.length} 個節點符合條件`;
   $('graph-empty').hidden = graph.nodes.length > 0;
@@ -85,23 +259,25 @@ function renderGraph() {
   for (const id of ['nodes', 'edges']) { $(id).style.width = `${width}px`; $(id).style.height = `${height}px`; $(id).style.transform = `scale(${zoom})`; }
   $('edges').setAttribute('width', width); $('edges').setAttribute('height', height);
   $('zoom-value').textContent = `${Math.round(zoom * 100)}%`;
-  $('edges').innerHTML = '<defs><marker id="arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0 0L7 3.5L0 7" fill="none" stroke="#72856c"/></marker></defs>' + graph.edges.map((e, index) => {
+  updateGraphMarkup('edges', '<defs><marker id="arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0 0L7 3.5L0 7" fill="none" stroke="#72856c"/></marker></defs>' + graph.edges.map((e, index) => {
     const a = positions.get(e.from), b = positions.get(e.to);
     const lane = a.y === b.y ? a.y + 122 + index % 3 * 5 : Math.min(a.y, b.y) + 125 + index % 3 * 5;
-    const d = a.y === b.y && Math.abs(a.x - b.x) === 160 ? `M${a.x + (a.x < b.x ? 120 : 0)} ${a.y + 53}H${b.x + (a.x < b.x ? 0 : 120)}` : `M${a.x + 60} ${a.y + 106}V${lane}H${b.x + 60}V${b.y}`;
+    const startY = b.y < a.y ? a.y : a.y + 106;
+    const endY = b.y <= a.y ? b.y + 106 : b.y;
+    const d = a.y === b.y && Math.abs(a.x - b.x) === 160 ? `M${a.x + (a.x < b.x ? 120 : 0)} ${a.y + 53}H${b.x + (a.x < b.x ? 0 : 120)}` : `M${a.x + 60} ${startY}V${lane}H${b.x + 60}V${endY}`;
     return `<path class="edge ${e.observed ? '' : 'unobserved'} ${e.from === selectedNode || e.to === selectedNode ? 'related' : ''}" d="${d}" marker-end="url(#arrow)"><title>${esc(e.from)} → ${esc(e.to)} · ${esc(e.kind)} · ${e.observed ? '已觀測' : '近期未觀測'}</title></path>`;
-  }).join('');
-  $('nodes').innerHTML = graph.nodes.map(n => {
+  }).join(''));
+  updateGraphMarkup('nodes', graph.nodes.map(n => {
     const p = positions.get(n.id);
     const values = {traffic: number(n.traffic, ' req/s'), errors: number(n.errors, '%', 100), latency: number(n.p95_ms, ' ms'), saturation: number(n.saturation, '%', 100), liveness: n.alive === true ? 'alive: true' : n.alive === false ? 'alive: false' : '—'};
     return `<button class="graph-node ${esc(n.kind)} ${selectedNode === n.id ? 'selected' : ''} ${matches.has(n.id) ? '' : 'dim'}" data-node="${esc(n.id)}" style="left:${p.x}px;top:${p.y}px" aria-pressed="${selectedNode === n.id}"><span class="node-name">${esc(n.id)}</span><span class="node-meta ${esc(n.status)}"><span><i class="dot ${esc(n.status)}"></i>${esc(health[n.status])}</span><span>觀測</span></span><span class="node-value">${esc(values[n.primary_axis] ?? '主要量測 —')}</span></button>`;
-  }).join('');
+  }).join(''));
   $('nodes').querySelectorAll('[data-node]').forEach(button => button.onclick = () => locateNode(button.dataset.node));
-  $('sources').innerHTML = '<span>觀測來源</span>' + ['prometheus', 'jaeger', 'logstore'].map(key => {
+  updateGraphMarkup('sources', '<span>觀測來源</span>' + ['prometheus', 'jaeger', 'logstore'].map(key => {
     const s = graph.sources[key];
     return `<span>${key} · ${s?.ok === true ? '可用' : s?.ok === false ? '不可用' : '無資料'} · ${esc(number(s?.age_secs, ' 秒前'))}</span>`;
-  }).join('');
-  $('footer-status').textContent = `來源快照 #${graph.seq} · 觀測時間 ${at(graph.at)} · 後端接收 ${at(graphReceivedAt)}；心跳不代表新量測`;
+  }).join(''));
+  $('footer-status').textContent = `${snapshotBusy ? '目前顯示' : viewingHistory ? '歷史' : '即時'}快照 #${graph.seq} · 觀測時間 ${localTime(graph.at)} (+08:00)${viewingHistory ? '；右側調查與 Monitor 紀錄仍為即時' : ` · 後端接收 ${at(graphReceivedAt)}；心跳不代表新量測`}`;
   renderNode();
 }
 function locateNode(id) {
@@ -112,9 +288,9 @@ function locateNode(id) {
 }
 function renderNode() {
   const n = graph?.nodes.find(n => n.id === selectedNode);
-  if (!n) { $('node-detail').innerHTML = '<div class="empty">點選節點查看後端量測。</div>'; return; }
+  if (!n) { updateGraphMarkup('node-detail', '<div class="empty">點選節點查看後端量測。</div>'); return; }
   const metrics = [['請求量', number(n.traffic, ' req/s')], ['錯誤率', number(n.errors, '%', 100)], ['P95', number(n.p95_ms, ' ms')], ['飽和度', number(n.saturation, '%', 100)], ['alive', n.alive === true ? 'true' : n.alive === false ? 'false' : '—']];
-  $('node-detail').innerHTML = `<div class="node-detail-top"><h3>${esc(n.id)}</h3><span class="${esc(n.status)}">${esc(health[n.status])}</span></div><div class="node-metrics">${metrics.map(([label, value]) => `<div><span class="metric-label">${label}</span><strong>${esc(value)}</strong></div>`).join('')}</div><p class="report-note">alive 與來源量測的定義由後端決定；調查結束不會改變服務健康。</p><details><summary>原始節點與相鄰連線</summary>${raw({node: n, edges: graph.edges.filter(e => e.from === n.id || e.to === n.id)})}</details>`;
+  updateGraphMarkup('node-detail', `<div class="node-detail-top"><h3>${esc(n.id)}</h3><span class="${esc(n.status)}">${esc(health[n.status])}</span></div><div class="node-metrics">${metrics.map(([label, value]) => `<div><span class="metric-label">${label}</span><strong>${esc(value)}</strong></div>`).join('')}</div><p class="report-note">alive 與來源量測的定義由後端決定；調查結束不會改變服務健康。</p><details><summary>原始節點與相鄰連線</summary>${raw({node: n, edges: graph.edges.filter(e => e.from === n.id || e.to === n.id)})}</details>`);
 }
 
 function activityHTML(id, terminal = false, sourceFilter = 'all') {
@@ -311,6 +487,7 @@ function route() {
 
 async function refresh() {
   if (refreshBusy) return;
+  void loadSnapshotIndex();
   refreshBusy = true; $('refresh').disabled = true;
   const generation = graphGeneration;
   try {
@@ -429,6 +606,7 @@ function visibilityChanged() {
 }
 function dispose() {
   disposed = true; pauseStreams(); clearInterval(heartbeatTimer);
+  clearInterval(snapshotPoll); cancelSnapshot(); snapshotIndexController?.abort();
   document.removeEventListener('visibilitychange', visibilityChanged);
 }
 
@@ -440,8 +618,21 @@ export function startWorkspace() {
   $('investigation-phase').parentElement.querySelector('h2').textContent = '目前調查';
   $('show-report').textContent = '目前調查報告';
   $('active-phase').previousElementSibling.textContent = '目前調查';
-  $('graph-viewport').parentElement.querySelector('.assessment-legend').textContent = '健康依後端觀測；按節點 ID 排列，位置不表示呼叫順序。';
+  $('graph-viewport').parentElement.querySelector('.assessment-legend').textContent = '健康依後端觀測；同一節點位置固定，位置不表示呼叫順序。';
   $('page-title').closest('.page-heading').insertAdjacentHTML('afterend', '<div class="investigation-actions"><button id="start-investigation" disabled>開始調查</button><span id="submission-status" role="status">僅在按下按鈕後開始；重新整理不會建立調查。</span></div>');
+  $('snapshot-at').previousElementSibling.textContent = '顯示快照時間 · 台灣';
+  $('graph-timeline').hidden = false;
+  $('snapshot-range').oninput = event => { if (timelineBounds) selectSnapshot(timelineBounds.from + Number(event.target.value)); };
+  $('snapshot-range').onchange = event => { if (timelineBounds) selectSnapshot(timelineBounds.from + Number(event.target.value), true); };
+  $('snapshot-range').onkeydown = event => {
+    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
+      event.preventDefault(); stepSnapshot(['ArrowLeft', 'ArrowDown'].includes(event.key) ? -1 : 1);
+    }
+  };
+  $('snapshot-prev').onclick = () => stepSnapshot(-1);
+  $('snapshot-next').onclick = () => stepSnapshot(1);
+  $('graph-live').onclick = returnToLive;
+  snapshotPoll = setInterval(() => void loadSnapshotIndex(), 5000);
   $('incidents-view').querySelector('thead tr').innerHTML = '<th>調查</th><th>狀態</th><th>原因</th><th>開始時間 · UTC</th><th>結果</th><th>報告</th>';
   $('incident-search').placeholder = '搜尋調查 ID、摘要或狀態…';
   document.querySelector('label[for="incident-search"]')?.setAttribute('aria-label', '搜尋調查');
