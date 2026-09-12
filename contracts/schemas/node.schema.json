@@ -106,7 +106,7 @@
           "additionalProperties": false
         }
       },
-      "additionalProperties": false
+      "additionalProperties": { "type": "number" }
     },
     "revision": { "type": "string" },
     "checks": {

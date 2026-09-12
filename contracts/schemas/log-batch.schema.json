@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "POST /api/logs request body",
+  "type": "object",
+  "required": ["logs"],
+  "properties": {
+    "logs": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 50,
+      "items": { "$ref": "log.schema.json" }
+    }
+  },
+  "additionalProperties": false
+}

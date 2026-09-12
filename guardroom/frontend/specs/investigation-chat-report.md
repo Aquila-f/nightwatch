@@ -12,7 +12,7 @@
 - 已支援 investigation.started、tool.started、observation.recorded、tool.failed、report.submitted、investigation.finished。
 - 工具以 investigation_id + payload.call_id 配對；report.submitted 要求 tool=submit_report 與 report 物件。
 - 報告優先 report.investigation_report，兼容 report.agent_report；history/detail/context 已有流程。
-- contracts/schemas/sse-line.schema.json 為舊串流，contracts/ 缺目前 investigation 契約；新增事件須先確認後端與授權範圍。
+- 舊串流的 contracts/schemas/sse-line.schema.json 已移除；contracts/ 仍缺目前 investigation 契約，新增事件須先確認後端與授權範圍。
 
 ## 畫面與互動
 1. 右側頂部：Agent 圖示、狀態、歷史入口；置頂一排 total token、cache 命中率、模型請求、工具呼叫。缺值顯示 —。

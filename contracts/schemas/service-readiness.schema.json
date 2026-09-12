@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "GET /health/ready response body",
+  "type": "object",
+  "required": ["status", "checks"],
+  "properties": {
+    "status": { "enum": ["ok", "degraded"] },
+    "checks": {
+      "type": "object",
+      "required": ["graph_updates", "history_updates"],
+      "properties": {
+        "graph_updates": { "type": "boolean" },
+        "history_updates": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
