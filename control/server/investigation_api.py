@@ -335,13 +335,16 @@ def install_investigations(app, *, model_factory: Callable[[], Any] | None = Non
                                    graph_factory=graph_factory, graph_url=graph_url, limits=limits)
     app.state.investigation_manager = manager
 
+    previous_lifespan = app.router.lifespan_context
+
     @asynccontextmanager
     async def lifespan(application):
-        await manager.start()
-        try:
-            yield
-        finally:
-            await manager.stop()
+        async with previous_lifespan(application):
+            await manager.start()
+            try:
+                yield
+            finally:
+                await manager.stop()
 
     app.router.lifespan_context = lifespan
     headers = {"Cache-Control": "no-store"}
