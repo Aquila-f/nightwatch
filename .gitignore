@@ -4,7 +4,6 @@ dist/
 **/.codex/*
 .trials/*/
 *.log
-control/nightwatch-control
 deploy/.build/
 shop/shop
 oteldemo/.build/

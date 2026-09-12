@@ -60,6 +60,6 @@ HTTP client 將當前 invocation ID 放入內部 `X-Nightwatch-Parent-Invocation
 
 ## 部署與驗證
 
-四個 Python 服務都需要掛載 `control/monitor` 與可寫的共用 `control/tmp`；Guard Room 唯讀取得同一份 JSONL。新增 ID 必須同時加入 graph config；修改後需重啟 Guard Room，服務程式改動需重建 Shop 映像。
+四個 Python 服務都需要掛載 `monitor` 與可寫的共用 `.run/monitor`；Guard Room 唯讀取得同一份 JSONL。新增 ID 必須同時加入 graph config；修改後需重啟 Guard Room，服務程式改動需重建 Shop 映像。
 
-整合測試 `shop-web/backend/tests/test_api.py` 會在臨時資料庫及四個隔離服務程序中檢查：既有 API 行為、跨服務 parent ID、結帳例外後 abort、成功結帳 complete、4xx 不算系統失敗，以及真實 Catalog SQL 失敗的 500 沿 Gateway 正確分類。這些測試不使用正式 Shop 資料。
+整合測試 `examples/shop/backend/tests/test_api.py` 會在臨時資料庫及四個隔離服務程序中檢查：既有 API 行為、跨服務 parent ID、結帳例外後 abort、成功結帳 complete、4xx 不算系統失敗，以及真實 Catalog SQL 失敗的 500 沿 Gateway 正確分類。這些測試不使用正式 Shop 資料。

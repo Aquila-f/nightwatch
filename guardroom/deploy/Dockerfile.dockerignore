@@ -1,0 +1,23 @@
+# Only include runtime code, locked dependency metadata and schemas.
+**
+!investigation-agent/
+!investigation-agent/**
+!guardroom/backend/
+!guardroom/backend/*.py
+!guardroom/backend/pyproject.toml
+!guardroom/backend/uv.lock
+!contracts/
+!contracts/schemas/
+!contracts/schemas/**
+!guardroom/
+!guardroom/configs/
+!guardroom/configs/shop.json
+**/__pycache__/
+**/*.pyc
+**/.env*
+**/.venv
+**/.venv/**
+**/.git
+**/.run
+**/.data
+**/tmp

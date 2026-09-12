@@ -27,10 +27,10 @@ fi
 console_port="$((10#$console_port))"
 
 shop_compose() {
-  docker compose -p "$PROJECT_NAME" -f "$repo_dir/shop-web/compose.yaml" "$@"
+  docker compose -p "$PROJECT_NAME" -f "$repo_dir/examples/shop/compose.yaml" "$@"
 }
 guardroom_compose() {
-  docker compose --project-directory "$repo_dir/guardroom" -p "$GUARDROOM_PROJECT_NAME" -f "$repo_dir/guardroom/compose.yaml" "$@"
+  docker compose --project-directory "$repo_dir/guardroom/deploy" -p "$GUARDROOM_PROJECT_NAME" -f "$repo_dir/guardroom/deploy/compose.yaml" "$@"
 }
 docker compose version >/dev/null
 shop_compose config --quiet
@@ -50,10 +50,10 @@ console_log="$run_dir/console.log"
 is_our_console() {
   local process_command process_cwd
   process_command="$(ps -p "$1" -o command=)" || return 1
-  if [[ " $process_command " == *" $repo_dir/console/serve.py "* ]]; then return 0; fi
+  if [[ " $process_command " == *" $repo_dir/guardroom/frontend/serve.py "* ]]; then return 0; fi
   process_cwd="$(lsof -a -p "$1" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p')"
-  [[ "$process_cwd" == "$repo_dir" && " $process_command " == *" console/serve.py "* ]] ||
-    [[ "$process_cwd" == "$repo_dir/console" && " $process_command " == *" serve.py "* ]]
+  [[ "$process_cwd" == "$repo_dir" && " $process_command " == *" guardroom/frontend/serve.py "* ]] ||
+    [[ "$process_cwd" == "$repo_dir/guardroom/frontend" && " $process_command " == *" serve.py "* ]]
 }
 console_pids="$(
   if [[ -f "$pid_file" ]]; then
@@ -92,8 +92,8 @@ stop_console() {
 
 if [[ "$action" == "--close" ]]; then
   stop_console
-  "$repo_dir/guardroom/restart.sh" --close
-  "$repo_dir/shop-web/restart.sh" --close
+  "$repo_dir/guardroom/deploy/restart.sh" --close
+  "$repo_dir/examples/shop/restart.sh" --close
   printf 'All services stopped; Docker volumes and monitor logs preserved.\n'
   exit 0
 fi
@@ -106,9 +106,9 @@ if [[ -z "${PORT:-}" && -n "$guardroom_id" ]]; then
   if [[ -n "$existing_port" ]]; then export PORT="$existing_port"; fi
 fi
 
-python3 -B "$repo_dir/console/build.py"
-"$repo_dir/shop-web/restart.sh" "$action"
-"$repo_dir/guardroom/restart.sh" "$action"
+python3 -B "$repo_dir/guardroom/frontend/build.py"
+"$repo_dir/examples/shop/restart.sh" "$action"
+"$repo_dir/guardroom/deploy/restart.sh" "$action"
 shop_frontend="$(shop_compose port frontend 80)"
 shop_backend="$(shop_compose port backend 8000)"
 guardroom="$(guardroom_compose port guardroom 9999)"
@@ -116,7 +116,7 @@ guardroom="$(guardroom_compose port guardroom 9999)"
 stop_console
 # Detach from the launcher's process group so Console survives terminal/tool exit.
 # Shell opens the log; Python only launches the child and returns its PID.
-console_pid="$(python3 -B - "$repo_dir/console/serve.py" "$console_port" "http://$guardroom" 3>>"$console_log" <<'PY'
+console_pid="$(python3 -B - "$repo_dir/guardroom/frontend/serve.py" "$console_port" "http://$guardroom" 3>>"$console_log" <<'PY'
 import subprocess
 import sys
 
@@ -154,4 +154,4 @@ printf 'Shop API docs:         http://%s/docs\n' "$shop_backend"
 printf 'Guard Room API docs:   http://%s/docs\n' "$guardroom"
 printf 'Graph JSON:            http://%s/api/graph\n' "$guardroom"
 printf 'Console log: %s (PID %s)\n' "$console_log" "$console_pid"
-guardroom_compose exec -T guardroom python -c 'import os; print("AI key: configured (not validated)" if os.getenv("NIGHTWATCH_LLM_API_KEY") or os.getenv("OPENAI_API_KEY") else "AI key: missing; monitoring works, but AI investigation needs a key in guardroom/.env")'
+guardroom_compose exec -T guardroom python -c 'import os; print("AI key: configured (not validated)" if os.getenv("NIGHTWATCH_LLM_API_KEY") or os.getenv("OPENAI_API_KEY") else "AI key: missing; monitoring works, but AI investigation needs a key in guardroom/deploy/.env")'
