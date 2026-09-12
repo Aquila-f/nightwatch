@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "NightWatch graph node",
+  "type": "object",
+  "required": [
+    "id",
+    "kind",
+    "traffic",
+    "errors",
+    "p95_ms",
+    "saturation",
+    "alive",
+    "sat_label",
+    "status",
+    "assessment",
+    "trend",
+    "extras",
+    "checks",
+    "logs_indexed"
+  ],
+  "properties": {
+    "id": { "type": "string" },
+    "selector": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "kind": {
+      "enum": ["service", "datastore", "queue", "volume", "synthetic", "external"]
+    },
+    "traffic": { "type": ["number", "null"] },
+    "errors": { "type": ["number", "null"] },
+    "p95_ms": { "type": ["number", "null"] },
+    "saturation": { "type": ["number", "null"] },
+    "alive": { "type": "boolean" },
+    "sat_label": { "type": "string" },
+    "primary_axis": {
+      "type": ["string", "null"],
+      "enum": ["traffic", "errors", "latency", "saturation", "liveness", null]
+    },
+    "status": { "enum": ["ok", "warning", "failing", "unknown"] },
+    "assessment": { "enum": ["unassessed", "suspect", "ruled_out", "origin"] },
+    "trend": {
+      "type": "object",
+      "required": ["errors", "latency", "saturation"],
+      "properties": {
+        "traffic": { "enum": ["rising", "falling", "flat", "na"] },
+        "errors": { "enum": ["rising", "falling", "flat", "na"] },
+        "latency": { "enum": ["rising", "falling", "flat", "na"] },
+        "saturation": { "enum": ["rising", "falling", "flat", "na"] },
+        "liveness": { "enum": ["rising", "falling", "flat", "na"] }
+      },
+      "additionalProperties": false
+    },
+    "extras": {
+      "type": "object",
+      "properties": {
+        "pool_in_use": { "type": "number" },
+        "pool_max": { "type": "number" },
+        "pool_wait_total": { "type": "number" },
+        "requests_per_s": { "type": "number" },
+        "consumer_lag": { "type": "number" },
+        "publish_per_s": { "type": "number" },
+        "depth": { "type": "number" },
+        "oldest_age_secs": { "type": "number" },
+        "enqueue_per_s": { "type": "number" },
+        "dequeue_per_s": { "type": "number" },
+        "used_ratio": { "type": "number" },
+        "write_p95_ms": { "type": "number" },
+        "write_errors_total": { "type": "number" },
+        "enospc_total": { "type": "number" },
+        "top_error_spans": {
+          "type": "array",
+          "maxItems": 3,
+          "items": {
+            "type": "object",
+            "required": ["name", "count"],
+            "properties": {
+              "name": { "type": "string" },
+              "count": { "type": "number" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "top_slow_spans": {
+          "type": "array",
+          "maxItems": 3,
+          "items": {
+            "type": "object",
+            "required": ["name", "p95_ms"],
+            "properties": {
+              "name": { "type": "string" },
+              "p95_ms": { "type": "number" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "orders_per_s": { "type": "number" },
+        "fail_ratio": { "type": "number" },
+        "fail_reasons": {
+          "type": "object",
+          "properties": {
+            "http_error": { "type": "integer" },
+            "payment_declined": { "type": "integer" },
+            "fulfillment_timeout": { "type": "integer" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "revision": { "type": "string" },
+    "checks": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "logs_indexed": { "type": "boolean" }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,170 @@
+import {validateGraph} from './data.js';
+
+const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+const integer = value => Number.isSafeInteger(value) && value >= 0;
+const statuses = ['running', 'completed', 'failed', 'interrupted'];
+const types = ['investigation.started', 'tool.started', 'observation.recorded', 'tool.failed', 'report.submitted', 'investigation.finished', 'agent.output', 'agent.thinking_summary', 'agent.reasoning_status', 'agent.usage'];
+
+// Layout is a local view choice. It is not added to the backend graph payload.
+export function graphLayout(graph) {
+  const ids = graph.nodes.map(n => n.id).sort();
+  const neighbors = new Map(ids.map(id => [id, new Set()]));
+  const parents = new Map(ids.map(id => [id, new Set()]));
+  for (const edge of graph.edges || []) {
+    if (!neighbors.has(edge.from) || !neighbors.has(edge.to) || edge.from === edge.to) continue;
+    neighbors.get(edge.from).add(edge.to); neighbors.get(edge.to).add(edge.from);
+    parents.get(edge.to).add(edge.from);
+  }
+  const pending = new Set(ids), components = [], isolated = [];
+  for (const id of ids) {
+    if (!pending.delete(id)) continue;
+    const component = [id];
+    for (let i = 0; i < component.length; i++) {
+      for (const next of neighbors.get(component[i])) if (pending.delete(next)) component.push(next);
+    }
+    if (component.length === 1) isolated.push(id); else components.push(component);
+  }
+  components.sort((a, b) => b.length - a.length || a[0].localeCompare(b[0]));
+  const result = [];
+  let offset = 0;
+  for (const component of components) {
+    const remaining = new Set(component.sort()), levels = new Map();
+    // Break cycles deterministically so reciprocal dependencies remain renderable.
+    while (remaining.size) {
+      const ready = [...remaining].filter(id => [...parents.get(id)].every(parent => !remaining.has(parent)));
+      if (!ready.length) ready.push([...remaining][0]);
+      for (const id of ready) {
+        levels.set(id, Math.max(-1, ...[...parents.get(id)].map(parent => levels.get(parent) ?? -1)) + 1);
+        remaining.delete(id);
+      }
+    }
+    const columns = [];
+    for (const id of component) (columns[levels.get(id)] ??= []).push(id);
+    const rows = Math.max(...columns.map(column => column.length));
+    columns.forEach((column, col) => column.forEach((id, row) => result.push({id, layout: {
+      col, row: offset + row * 2 + rows - column.length,
+    }})));
+    offset += rows * 2 + 1;
+  }
+  const columns = Math.max(1, Math.min(3, ids.length));
+  isolated.forEach((id, index) => result.push({id, layout: {
+    col: index % columns, row: offset + Math.floor(index / columns) * 2, isolated: true,
+  }}));
+  return result;
+}
+export function validateObservation(graph) {
+  if (!object(graph) || !Array.isArray(graph.nodes) || graph.nodes.some(n => !object(n) || typeof n.id !== 'string')) throw new Error('graph 缺少合法節點。');
+  validateGraph(graph, {nodes: graphLayout(graph)});
+  if (!Number.isFinite(Date.parse(graph.at))) throw new Error('graph.at 不是合法時間。');
+  return graph;
+}
+export function validateSummary(value) {
+  if (!object(value) || typeof value.id !== 'string' || !value.id || !statuses.includes(value.status) || !integer(value.event_seq)) throw new Error('調查摘要缺少 id、status 或 event_seq。');
+  return value;
+}
+export function validateInvestigationState(value) {
+  if (!object(value) || value.schema_version !== 'nightwatch.investigation-state.v1' || !integer(value.cursor) || !Number.isFinite(Date.parse(value.server_now))) throw new Error('調查 state 格式不符。');
+  if (!(value.active_investigation_id === null || typeof value.active_investigation_id === 'string') || !(value.last_completed_investigation_id === null || typeof value.last_completed_investigation_id === 'string')) throw new Error('調查 state 缺少 active 或 latest ID。');
+  if (value.active_investigation_id !== null) {
+    validateSummary(value.active_investigation);
+    if (value.active_investigation.id !== value.active_investigation_id || value.active_investigation.status !== 'running') throw new Error('目前調查 ID 與摘要不一致。');
+  } else if (value.active_investigation !== null) throw new Error('沒有 active ID 卻收到目前調查摘要。');
+  if (value.graph !== null) validateObservation(value.graph);
+  if (!(value.graph_error === null || typeof value.graph_error === 'string') || !(value.graph_received_at === null || Number.isFinite(Date.parse(value.graph_received_at)))) throw new Error('調查 state 缺少合法 graph_error 或 graph_received_at。');
+  return value;
+}
+export function validateInvestigationEvent(value) {
+  if (!object(value) || typeof value.investigation_id !== 'string' || !value.investigation_id || !integer(value.seq) || value.seq < 1 || !integer(value.cursor) || !types.includes(value.type) || !Number.isFinite(Date.parse(value.at)) || !object(value.payload)) throw new Error('調查事件格式不符。');
+  if (['tool.started', 'observation.recorded', 'tool.failed', 'report.submitted'].includes(value.type) && (typeof value.payload.call_id !== 'string' || !value.payload.call_id)) throw new Error('工具事件缺少 payload.call_id，無法配對。');
+  if (value.type === 'report.submitted' && (value.payload.tool !== 'submit_report' || !object(value.payload.report))) throw new Error('報告事件缺少 submit_report 或合法 report。');
+  if (value.type === 'agent.reasoning_status' && (typeof value.payload.message_id !== 'string' || !value.payload.message_id || value.payload.status !== 'summary_unavailable')) throw new Error('推理狀態缺少 message_id 或狀態無效。');
+  if (['agent.output', 'agent.thinking_summary'].includes(value.type) && (typeof value.payload.message_id !== 'string' || !value.payload.message_id || typeof value.payload.text !== 'string' || !value.payload.text.trim())) throw new Error('Agent 訊息缺少 message_id 或 text。');
+  if (value.type === 'agent.usage' && !object(value.payload.usage)) throw new Error('Agent 用量事件缺少 usage。');
+  return value;
+}
+export async function requestJSON(path, options = {}) {
+  const controller = new AbortController();
+  const cancel = () => controller.abort();
+  if (options.signal?.aborted) cancel();
+  options.signal?.addEventListener('abort', cancel, {once: true});
+  const timer = setTimeout(() => controller.abort(), 10000);
+  try {
+    const response = await fetch(path, {cache: 'no-store', ...options, signal: controller.signal,
+      headers: {Accept: 'application/json', ...(options.body ? {'Content-Type': 'application/json'} : {}), ...options.headers}});
+    const text = await response.text();
+    let value;
+    try { value = JSON.parse(text); } catch { throw new Error(`${path} 回傳非 JSON（HTTP ${response.status}）。`); }
+    if (!response.ok) {
+      const error = new Error(`${value.error?.code || value.detail?.code || 'http_error'}：${value.error?.message_zh || `HTTP ${response.status}`}`);
+      error.status = response.status; error.details = value.error?.details; throw error;
+    }
+    return value;
+  } catch (error) {
+    if (options.signal?.aborted) throw error;
+    if (error.name === 'AbortError') throw new Error(`${path} 超過 10 秒未回應。`);
+    throw error;
+  } finally { clearTimeout(timer); options.signal?.removeEventListener('abort', cancel); }
+}
+
+export class InvestigationStore {
+  state = null;
+  stateWatermark = -1;
+  eventCursor = null;
+  events = new Map();
+
+  acceptState(value, {initialStream = false} = {}) {
+    validateInvestigationState(value);
+    // Only a brand-new stream establishes the initial tail cursor. REST and
+    // reconnect state must never skip history which is still being replayed.
+    if (initialStream && this.eventCursor === null) this.eventCursor = value.cursor;
+    if (value.cursor < this.stateWatermark || (value.cursor === this.stateWatermark && this.state && Date.parse(value.server_now) < Date.parse(this.state.server_now))) return false;
+    this.stateWatermark = value.cursor; this.state = value; return true;
+  }
+  acceptEvent(value, {stream = false} = {}) {
+    validateInvestigationEvent(value);
+    let events = this.events.get(value.investigation_id);
+    if (!events) { events = new Map(); this.events.set(value.investigation_id, events); }
+    const fresh = !events.has(value.seq);
+    if (fresh) events.set(value.seq, value);
+    if (stream) this.eventCursor = Math.max(this.eventCursor ?? 0, value.cursor);
+    return fresh;
+  }
+  activity(id) { return [...(this.events.get(id)?.values() || [])].sort((a, b) => a.seq - b.seq); }
+}
+
+export function pairedActivity(events, terminal = false) {
+  const rows = [], calls = new Map();
+  for (const event of events) {
+    if (['tool.started', 'observation.recorded', 'tool.failed', 'report.submitted'].includes(event.type)) {
+      const key = JSON.stringify([event.investigation_id, event.payload.call_id]);
+      let row = calls.get(key);
+      if (!row) { row = {kind: 'tool', investigation_id: event.investigation_id, call_id: event.payload.call_id, seq: event.seq}; calls.set(key, row); rows.push(row); }
+      if (event.type === 'tool.started') row.started = event;
+      else row.finished = event;
+    } else rows.push({kind: 'event', event, seq: event.seq});
+  }
+  for (const row of calls.values()) row.status = row.finished ? (row.finished.type === 'tool.failed' ? 'failed' : row.finished.type === 'report.submitted' ? 'reported' : 'recorded') : terminal ? 'incomplete' : 'running';
+  return rows.sort((a, b) => a.seq - b.seq);
+}
+
+
+const primaryNodes = new Set([
+  'shop-products', 'shop-cart-read', 'shop-cart-mutate',
+  'shop-checkout-request', 'shop-checkout-logic', 'shop-db-write',
+]);
+
+// Keep the full observation intact for evidence and detail views.
+export function focusedGraph(graph, {all = false, search = '', selected = null} = {}) {
+  if (all || !graph.nodes.some(node => primaryNodes.has(node.id))) return graph;
+  const query = search.trim().toLowerCase();
+  const nodes = graph.nodes.filter(node => primaryNodes.has(node.id)
+    || ['warning', 'failing'].includes(node.status) || node.id === selected
+    || (query && node.id.toLowerCase().includes(query)));
+  const visible = new Set(nodes.map(node => node.id));
+  return {...graph, nodes, edges: graph.edges.filter(edge => visible.has(edge.from) && visible.has(edge.to))};
+}
+
+export function retainLog(logs, log, limit = 200) {
+  logs.set(JSON.stringify([log.monitor_id, log.event_id]), log);
+  while (logs.size > limit) logs.delete(logs.keys().next().value);
+}

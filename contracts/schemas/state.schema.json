@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "NightWatch shared state projection",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "server_now",
+    "run",
+    "readiness",
+    "model",
+    "graph_now",
+    "faults",
+    "incident",
+    "capabilities",
+    "next_step_zh"
+  ],
+  "properties": {
+    "schema_version": { "const": "nightwatch.state.v2" },
+    "server_now": { "type": "string" },
+    "run": {
+      "type": "object",
+      "required": ["id", "started_at", "baseline"],
+      "properties": {
+        "id": { "type": "string" },
+        "started_at": { "type": "string" },
+        "baseline": {
+          "type": "object",
+          "required": ["status", "collected_secs", "required_secs"],
+          "properties": {
+            "status": { "enum": ["collecting", "ready"] },
+            "collected_secs": { "type": "integer" },
+            "required_secs": { "type": "integer" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "readiness": { "$ref": "readiness.schema.json" },
+    "model": {
+      "type": "object",
+      "required": ["available", "model", "effort"],
+      "properties": {
+        "available": { "type": "boolean" },
+        "model": { "type": "string" },
+        "effort": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "graph_now": { "$ref": "snapshot.schema.json" },
+    "faults": { "$ref": "faults.schema.json" },
+    "incident": {
+      "type": ["object", "null"],
+      "additionalProperties": true
+    },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "next_step_zh": { "type": "string" }
+  },
+  "additionalProperties": false
+}

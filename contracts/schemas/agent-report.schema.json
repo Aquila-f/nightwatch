@@ -1,0 +1,215 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "NightWatch agent root-cause report",
+  "type": "object",
+  "required": [
+    "root_cause",
+    "confidence",
+    "cited_evidence_ids",
+    "timeline",
+    "contributing",
+    "ruled_out"
+  ],
+  "properties": {
+    "root_cause": {
+      "type": "object",
+      "required": ["node", "mechanism", "summary_zh"],
+      "properties": {
+        "node": { "type": "string" },
+        "mechanism": { "type": "string" },
+        "summary_zh": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "cited_evidence_ids": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string" }
+    },
+    "timeline": {
+      "type": "object",
+      "required": ["onset", "propagation"],
+      "properties": {
+        "onset": {
+          "type": "object",
+          "required": ["node", "t", "signal", "evidence_id"],
+          "properties": {
+            "node": { "type": "string" },
+            "t": { "type": "integer" },
+            "signal": { "enum": ["err", "p95", "sat", "up"] },
+            "evidence_id": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        "propagation": {
+          "type": "array",
+          "maxItems": 12,
+          "items": {
+            "type": "object",
+            "required": ["node", "t", "signal"],
+            "properties": {
+              "node": { "type": "string" },
+              "t": { "type": "integer" },
+              "signal": { "enum": ["err", "p95", "sat", "up"] }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "contributing": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["node", "mechanism", "summary_zh", "evidence_id", "role"],
+        "properties": {
+          "node": { "type": "string" },
+          "mechanism": { "type": "string" },
+          "summary_zh": { "type": "string" },
+          "evidence_id": { "type": "string" },
+          "role": { "enum": ["secondary", "decoy"] }
+        },
+        "additionalProperties": false
+      }
+    },
+    "ruled_out": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["node", "reason"],
+        "properties": {
+          "node": { "type": "string" },
+          "reason": { "enum": ["contained", "no_deviation", "downstream_of_root"] },
+          "evidence_id": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "repair_plan": {
+      "type": "object",
+      "required": [
+        "reason_zh",
+        "expected_result_zh",
+        "commands"
+      ],
+      "properties": {
+        "reason_zh": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expected_result_zh": {
+          "type": "string",
+          "minLength": 1
+        },
+        "commands": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "required": [
+              "target",
+              "operation"
+            ],
+            "properties": {
+              "target": {
+                "type": "string",
+                "minLength": 1
+              },
+              "operation": {
+                "enum": [
+                  "restore_config",
+                  "patch_config",
+                  "maintenance"
+                ]
+              },
+              "knobs": {
+                "type": "object",
+                "minProperties": 1,
+                "additionalProperties": {
+                  "type": [
+                    "string",
+                    "number",
+                    "boolean"
+                  ]
+                }
+              },
+              "maintenance_id": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false,
+            "oneOf": [
+              {
+                "properties": {
+                  "operation": {
+                    "const": "restore_config"
+                  }
+                },
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "knobs"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "maintenance_id"
+                      ]
+                    }
+                  ]
+                }
+              },
+              {
+                "properties": {
+                  "operation": {
+                    "const": "patch_config"
+                  }
+                },
+                "required": [
+                  "knobs"
+                ],
+                "not": {
+                  "required": [
+                    "maintenance_id"
+                  ]
+                }
+              },
+              {
+                "properties": {
+                  "operation": {
+                    "const": "maintenance"
+                  }
+                },
+                "required": [
+                  "maintenance_id"
+                ],
+                "not": {
+                  "required": [
+                    "knobs"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "cited_event_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "additionalProperties": false
+}

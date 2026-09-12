@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; object-src 'none'; base-uri 'none'">
+  <title>NightWatch · 服務拓樸與事故</title>
+  <link rel="stylesheet" href="app.css">
+  <script type="module" src="workspace.js"></script>
+</head>
+<body>
+<header><a class="brand" href="#topology"><span class="brand-mark" aria-hidden="true">◉</span>NightWatch</a><nav aria-label="主要導覽"><a href="#topology" id="nav-topology">服務拓樸</a><a href="#incidents" id="nav-incidents">事故列表 <span id="nav-count">—</span></a></nav><div class="header-end"><a href="#usage" id="nav-usage" hidden>Usage</a><span id="connection" role="status">載入中</span><label class="source-select">資料來源<select id="source"><option value="live">即時 API</option><option value="recording">專案事故錄影</option></select></label></div></header>
+<main>
+  <div id="errors" role="alert"></div>
+  <details id="connection-setup" class="connection-setup">
+    <summary>後端接線</summary>
+    <div class="connection-body">
+      <p>目前連線：<strong id="connection-target">正在讀取…</strong></p>
+      <div class="connection-check-row"><button id="check-connection" type="button" disabled>檢查目前連線</button><span id="connection-check" role="status">檢查狀態 API 與即時推播；不會修改後端。</span></div>
+      <label for="control-url">部署時的 control API 網址</label>
+      <input id="control-url" type="url" placeholder="http://127.0.0.1:9999" spellcheck="false" autocomplete="off">
+      <p>填入前端伺服器能連到的 control 網址。購物網站首頁不是狀態 API。</p>
+      <pre id="connect-command" aria-label="啟動指令"></pre>
+      <p id="command-note"></p>
+    </div>
+  </details>
+  <div id="mock-banner" class="mock-banner" hidden><div><strong>本機模擬 · 非真實 shop 狀態</strong><span>沿用舊錄影的 13 節點；只模擬 catalog 健康，不產生事故或 AI 結論。</span></div><label>模擬情境 <select id="mock-scenario"><option value="cycle">每 10 秒輪換</option><option value="ok">正常</option><option value="warning">警告</option><option value="failing">異常</option><option value="unknown">無資料</option><option value="unavailable">後端無法使用（503）</option></select></label></div>
+  <div id="recording" hidden><div><strong>事故錄影</strong><span>catalog_pool_leak · 2026-09-10 · 非目前系統狀態</span></div><label>事故時間 <input id="replay-time" type="range" min="0" max="180" value="60" step="5"><output id="replay-label">+60 秒</output></label></div>
+  <div class="page-heading"><div><div class="eyebrow">NIGHTWATCH / 觀測工作台</div><h1 id="page-title">服務拓樸</h1><p id="page-description">從服務關聯、量測與判定，掌握系統狀態。</p></div><button id="refresh" class="button">↻ 更新資料</button></div>
+  <section id="topology-view">
+    <div class="overview"><div><span class="metric-label">服務與資源</span><strong id="total-nodes">—</strong></div><div><span class="metric-label"><i class="dot failing"></i>異常</span><strong id="failing-count">—</strong></div><div><span class="metric-label"><i class="dot warning"></i>警告</span><strong id="warning-count">—</strong></div><div><span class="metric-label">目前事故</span><strong class="phase-count" id="active-phase">—</strong></div><div class="snapshot-time"><span class="metric-label">快照時間 · UTC</span><strong id="snapshot-at">—</strong></div></div>
+    <div class="investigation-layout"><section class="panel topology-panel"><div class="panel-header"><div><h2>服務關聯圖</h2><span id="graph-count">等待資料</span></div><div class="graph-controls"><label class="sr-only" for="node-search">搜尋服務</label><input id="node-search" type="search" placeholder="搜尋服務名稱…"><label class="sr-only" for="health-filter">節點健康篩選</label><select id="health-filter"><option value="all">全部健康狀態</option><option value="failing">異常</option><option value="warning">警告</option><option value="ok">正常</option><option value="unknown">無資料</option></select><button id="zoom-out" aria-label="縮小拓樸">−</button><span id="zoom-value">100%</span><button id="zoom-in" aria-label="放大拓樸">＋</button><button id="fit">符合視窗</button></div></div>
+    <div class="legend"><span><i class="dot ok"></i>正常</span><span><i class="dot warning"></i>警告</span><span><i class="dot failing"></i>異常</span><span><i class="dot unknown"></i>無資料</span><span class="assessment-legend">藍框：懷疑　 紅框＋標籤：根因　 斜線：已排除</span></div>
+    <div id="graph-viewport" tabindex="0" aria-label="服務拓樸，內容較寬時可水平捲動"><div id="graph-canvas"><svg id="edges" aria-label="服務連線"></svg><div id="nodes"></div></div><div id="graph-empty" class="empty">正在讀取服務拓樸…</div></div><div class="graph-caption"><span id="match-count"></span><span>箭頭依契約方向；虛線表示近期未觀測到流量，並不代表斷線。</span></div>
+    <section id="graph-timeline" class="graph-timeline" aria-label="歷史服務快照" hidden>
+      <div class="timeline-heading"><strong id="graph-mode">即時 graph</strong><button id="graph-live" type="button" disabled>回到即時</button></div>
+      <p id="graph-view-time" role="status">等待快照</p>
+      <div class="timeline-controls"><button id="snapshot-prev" type="button" disabled>上一張</button><label for="snapshot-range">歷史快照</label><output id="snapshot-target" for="snapshot-range">讀取中…</output><button id="snapshot-next" type="button" disabled>下一張</button></div>
+      <input id="snapshot-range" type="range" min="0" max="1" value="1" step="1" disabled aria-describedby="snapshot-note">
+      <div id="snapshot-ticks" class="snapshot-ticks" aria-hidden="true"></div>
+      <div class="timeline-bounds"><span id="snapshot-from">—</span><span id="snapshot-to">—</span></div>
+      <p id="snapshot-note" role="status">正在讀取可用歷史。</p>
+      <p id="snapshot-error" class="failing" role="alert" hidden></p>
+    </section>
+    <div id="node-detail" aria-live="polite"><div class="empty">點選節點查看量測與相鄰連線。</div></div><div id="sources" class="sources"></div></section>
+    <aside class="panel investigation-panel" aria-label="事故調查">
+      <div class="investigation-heading"><h2>事故調查</h2><span id="investigation-phase"></span></div>
+      <div id="investigation-summary"></div>
+      <section id="agent-usage" class="agent-usage" aria-label="Agent token 使用量"></section>
+      <div class="investigation-tabs" role="group" aria-label="調查內容"><button id="show-journal" aria-pressed="true">調查事件</button><button id="show-report" aria-pressed="false">AI 事故報告</button></div>
+      <section id="journal-panel"><div class="journal-toolbar"><div role="group" aria-label="事件來源"><button data-event-source="all" aria-pressed="true">全部</button><button data-event-source="monitor" aria-pressed="false">Monitor</button><button data-event-source="agent" aria-pressed="false">Agent</button><button data-event-source="system" aria-pressed="false">系統</button></div><span id="journal-count"></span></div><p id="journal-note"></p><div id="journal-entries"></div></section>
+      <section id="investigation-report" hidden></section>
+    </aside></div>
+    <section class="current-incident" id="current-incident"></section>
+  </section>
+  <section id="incidents-view" hidden>
+    <div class="list-toolbar"><div class="tabs" role="group" aria-label="事故狀態篩選"><button data-status="all" aria-pressed="true">全部</button><button data-status="active" aria-pressed="false">處理中</button><button data-status="closed" aria-pressed="false">已結束</button></div><label class="sr-only" for="incident-search">搜尋事故</label><input id="incident-search" type="search" placeholder="搜尋事故 ID、故障卡或狀態…"></div>
+    <div id="list-note" role="status"></div><div class="panel table-scroll"><table><thead><tr><th>事故</th><th>處理階段</th><th>故障卡</th><th>偵測時間 · UTC</th><th>結局</th><th><span class="sr-only">操作</span></th></tr></thead><tbody id="incident-rows"></tbody></table><div id="list-empty" class="empty" hidden></div></div><p class="list-footer" id="list-count"></p>
+    <section class="panel incident-detail" id="incident-detail" hidden aria-live="polite"></section>
+  </section>
+  <section id="usage-view" hidden aria-label="Agent Usage"></section>
+  <footer><span id="footer-status">等待資料來源</span><span>NightWatch · 只讀觀測</span></footer>
+</main>
+</body>
+</html>

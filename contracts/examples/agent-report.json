@@ -1,0 +1,15 @@
+{
+  "root_cause": {
+    "node": "catalog",
+    "mechanism": "connection pool exhausted",
+    "summary_zh": "catalog 的資料庫連線池耗盡。"
+  },
+  "confidence": 0.85,
+  "cited_evidence_ids": ["ev-0001"],
+  "timeline": {
+    "onset": { "node": "catalog", "t": -135, "signal": "sat", "evidence_id": "ev-0001" },
+    "propagation": []
+  },
+  "contributing": [],
+  "ruled_out": []
+}

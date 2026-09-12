@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "NightWatch fault instances projection",
+  "type": "object",
+  "required": ["instances", "generation"],
+  "properties": {
+    "instances": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "instance_id",
+          "card_id",
+          "status",
+          "revision",
+          "applied_at",
+          "expires_at",
+          "curve_progress",
+          "owned_resources"
+        ],
+        "properties": {
+          "instance_id": { "type": "string" },
+          "card_id": { "type": "string" },
+          "status": {
+            "enum": ["applying", "active", "restoring", "restored", "expired", "aborted", "unknown", "restore_failed"]
+          },
+          "revision": { "type": "string" },
+          "applied_at": { "type": ["string", "null"] },
+          "expires_at": { "type": ["string", "null"] },
+          "curve_progress": { "type": "number", "minimum": 0, "maximum": 1 },
+          "elapsed_secs": { "type": "number" },
+          "ttl_remaining_secs": { "type": "number" },
+          "detected_after_secs": { "type": ["number", "null"] },
+          "mitigated": { "type": "boolean" },
+          "owned_resources": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "generation": { "type": "integer" }
+  },
+  "additionalProperties": false
+}
