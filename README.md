@@ -123,6 +123,6 @@ The local storefront topology includes **18 operation nodes** across checkout, c
 
 ## What's next
 
-Broader telemetry adapters, deeper service coverage, and human-approved repair with post-action verification. Today, the core workflow is **monitoring → investigation → report**. Coverage follows the configured instrumentation; missing measurements remain unknown. General automated repair is future work. See the [integration notes](docs/readme/integration-status.md) for implementation details.
+Broader telemetry adapters, deeper service coverage, and human-approved repair with post-action verification. Today, the core workflow is **monitoring → investigation → report**. Coverage follows the configured instrumentation; missing measurements remain unknown. General automated repair is future work.
 
 <p align="center"><strong>From signals to understanding.</strong></p>

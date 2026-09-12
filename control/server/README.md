@@ -1,6 +1,6 @@
 # Guard Room HTTP server
 
-程式入口是 `main:app`。目前預設提供真實 monitor graph、日誌、快照歷史與 SQLite 調查。mock 必須明確設定 `NIGHTWATCH_MOCK_DATA=1`。實作缺口見 [INTEGRATION.md](../../INTEGRATION.md)。
+程式入口是 `main:app`。目前預設提供真實 monitor graph、日誌、快照歷史與 SQLite 調查。mock 必須明確設定 `NIGHTWATCH_MOCK_DATA=1`。
 
 ## 啟動
 
@@ -63,7 +63,7 @@ Graph URL 帶 query 或 `NIGHTWATCH_MOCK_DATA=1` 時停用自動偵測。這只�
 
 ## 尚未實作
 
-`/api/faults*`、換輪、操作進度、批准與中止只有 mock 實作，live 回 503。舊 `/api/incidents/{id}/report`、`timeline` 缺完整修復稽核，live 回 503；應讀 `/api/investigations/{id}/report`。完整端點清單與觀測限制見 [盤點](../../INTEGRATION.md)。
+`/api/faults*`、換輪、操作進度、批准與中止只有 mock 實作，live 回 503。舊 `/api/incidents/{id}/report`、`timeline` 缺完整修復稽核，live 回 503；應讀 `/api/investigations/{id}/report`。
 
 ## 調查對話事件
 

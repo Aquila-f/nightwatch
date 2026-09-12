@@ -1,6 +1,6 @@
 # Monitor 與調查 Agent
 
-`monitor/` 提供 `@monitor` 與 JSONL／HTTP 輸出。`nightwatch_agent/` 用真實 Guard Room API 調查，`server/` 提供 HTTP、持久化調查與自動偵測。完整缺口見 [盤點](../INTEGRATION.md)。
+`monitor/` 提供 `@monitor` 與 JSONL／HTTP 輸出。`nightwatch_agent/` 用真實 Guard Room API 調查，`server/` 提供 HTTP、持久化調查與自動偵測。
 
 ## CLI
 

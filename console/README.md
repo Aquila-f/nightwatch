@@ -64,7 +64,7 @@ control 自己的 `NIGHTWATCH_MOCK_DATA=1` 是另一個獨立開關；它不等�
 
 ## 目前限制
 
-畫面沒有故障注入、批准修復、換輪或對話入口。獨立報告頁讀調查 detail／events／context；`snapshots`、`export` 專用端點尚無獨立匯出操作。圖上監測範圍與未對接項目見 [盤點](../INTEGRATION.md)。
+畫面沒有故障注入、批准修復、換輪或對話入口。獨立報告頁讀調查 detail／events／context；`snapshots`、`export` 專用端點尚無獨立匯出操作。
 
 ## 調查對話與報告
 
