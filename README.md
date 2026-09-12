@@ -69,13 +69,13 @@ The integration boundary is **service signals and a configured graph**. Map your
 - **Other systems:** implement an adapter that sends `nightwatch.log.v1` events to `POST /api/logs`, with a configured `monitor_id` → node mapping.
 - **OpenTelemetry (OTel):** an OTel integration would use an adapter to this event format; that adapter and native OTLP ingestion are not included yet.
 
-Start with the [Monitor guide](control/monitor/README.md), [graph configuration](guardroom/README.md), and [HTTP API](control/server/README.md).
+Start with the [Monitor guide](monitor/README.md), [graph configuration](guardroom/README.md), and [HTTP API](guardroom/backend/README.md).
 
 ## Quick start
 
 You need Git, Docker + Compose, Python 3, curl, and lsof. Run these commands from the repository root:
 
-To enable AI investigation, configure `NIGHTWATCH_LLM_API_KEY` (or `OPENAI_API_KEY`) in your shell **before starting**, or in the Git-ignored `guardroom/.env`. Set `NIGHTWATCH_LLM_ENDPOINT` and `NIGHTWATCH_LLM_MODEL` for your model provider; see the [Agent guide](control/README.md).
+To enable AI investigation, configure `NIGHTWATCH_LLM_API_KEY` (or `OPENAI_API_KEY`) in your shell **before starting**, or in the Git-ignored `guardroom/deploy/.env`. Set `NIGHTWATCH_LLM_ENDPOINT` and `NIGHTWATCH_LLM_MODEL` for your model provider; see the [Agent guide](investigation-agent/README.md).
 
 ```sh
 git clone https://github.com/davidleitw/nightwatch-hack.git
@@ -114,12 +114,10 @@ The local storefront topology includes **18 operation nodes** across checkout, c
 
 | Component | Responsibility |
 | --- | --- |
-| [Monitor](control/monitor/README.md) | Capture function events and deliver them to Guard Room |
-| [Guard Room](guardroom/README.md) | Aggregate signals, maintain the graph, and store snapshots |
-| [AI Agent](control/README.md) | Investigate through tools and submit structured reports |
-| [Investigation API](control/server/README.md) | Coordinate investigations, persist evidence, and stream updates |
-| [Console](console/README.md) | Explore service state, history, and investigation results |
-| [Storefront](shop-web/README.md) | An integrated application with gateway, catalog, cart, and order services |
+| [Monitor](monitor/README.md) | Capture function events and deliver them to Guard Room |
+| [Guard Room](guardroom/README.md) | Backend aggregation and investigation APIs plus the web console |
+| [AI Agent](investigation-agent/README.md) | Investigate through tools and submit structured reports |
+| [Example Shop](examples/shop/README.md) | Example workload with gateway, catalog, cart, order, and frontend services |
 
 ## What's next
 

@@ -1,0 +1,16 @@
+[project]
+name = "nightwatch-guardroom-backend"
+version = "0.1.0"
+description = "NightWatch Guard Room API, graph aggregation, and investigation service"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115,<1",
+    "nightwatch-agent",
+    "uvicorn>=0.30,<1",
+]
+
+[tool.uv.sources]
+nightwatch-agent = { path = "../../investigation-agent" }
+
+[dependency-groups]
+dev = ["httpx>=0.27,<1"]

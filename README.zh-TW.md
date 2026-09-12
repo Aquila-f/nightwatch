@@ -69,13 +69,13 @@ flowchart LR
 - **其他既有系統：** 實作轉接層，將事件轉成 `nightwatch.log.v1` 送到 `POST /api/logs`，並設定 `monitor_id` → 節點對應。
 - **OpenTelemetry（OTel）：** 可透過轉接層對接上述事件格式；目前尚未內建此轉接層與原生 OTLP 接收。
 
-接入細節見 [Monitor 指南](control/monitor/README.md)、[服務圖設定](guardroom/README.md)與 [HTTP API](control/server/README.md)。
+接入細節見 [Monitor 指南](monitor/README.md)、[服務圖設定](guardroom/README.md)與 [HTTP API](guardroom/backend/README.md)。
 
 ## 快速開始
 
 需要 Git、Docker + Compose、Python 3、curl 與 lsof。以下命令從 repository 根目錄執行：
 
-啟用 AI 調查時，請在**啟動前**於 shell 設定 `NIGHTWATCH_LLM_API_KEY`（或 `OPENAI_API_KEY`），也可放入 Git 忽略的 `guardroom/.env`。透過 `NIGHTWATCH_LLM_ENDPOINT` 與 `NIGHTWATCH_LLM_MODEL` 設定模型服務，詳見 [Agent 指南](control/README.md)。
+啟用 AI 調查時，請在**啟動前**於 shell 設定 `NIGHTWATCH_LLM_API_KEY`（或 `OPENAI_API_KEY`），也可放入 Git 忽略的 `guardroom/deploy/.env`。透過 `NIGHTWATCH_LLM_ENDPOINT` 與 `NIGHTWATCH_LLM_MODEL` 設定模型服務，詳見 [Agent 指南](investigation-agent/README.md)。
 
 ```sh
 git clone https://github.com/davidleitw/nightwatch-hack.git
@@ -114,12 +114,10 @@ curl --fail-with-body http://127.0.0.1:9999/api/graph
 
 | 元件 | 負責什麼 |
 | --- | --- |
-| [Monitor](control/monitor/README.md) | 收集函式事件並傳送至 Guard Room |
-| [Guard Room](guardroom/README.md) | 彙整訊號、維護服務圖、保存快照 |
-| [AI Agent](control/README.md) | 使用工具調查，提交結構化報告 |
-| [調查 API](control/server/README.md) | 管理調查、保存證據、推送即時更新 |
-| [Console](console/README.md) | 查看服務狀態、歷史快照與調查結果 |
-| [購物網站](shop-web/README.md) | 串接 gateway、catalog、cart、order 的應用範例 |
+| [Monitor](monitor/README.md) | 收集函式事件並傳送至 Guard Room |
+| [Guard Room](guardroom/README.md) | 後端聚合與調查 API，以及 Web 操作介面 |
+| [AI Agent](investigation-agent/README.md) | 使用工具調查，提交結構化報告 |
+| [Example Shop](examples/shop/README.md) | 包含 gateway、catalog、cart、order 與前端的範例 workload |
 
 ## 接下來
 

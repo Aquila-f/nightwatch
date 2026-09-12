@@ -1,36 +1,38 @@
-# Guard Room 啟動與設定
+# Guard Room
 
-HTTP server 實作在 [control/server/](../control/server/README.md)；本目錄提供 Docker Compose、拓撲設定與啟動腳本。整套 Shop／Guard Room／Console 可由 repo 根目錄 `./restart.sh` 啟動，操作方式見 [根目錄 README](../README.md)。
+Guard Room 的 [backend](backend/README.md) 聚合 monitor 訊號、保存 graph 與調查資料，
+[frontend](frontend/README.md) 提供拓撲與調查工作台。`deploy/` 放部署檔，`configs/` 放拓撲設定。
+整套 Example Shop／Guard Room 可由 repo 根目錄 `./restart.sh` 啟動。
 
 ## Docker 操作與資料保存
 
-`./guardroom/restart.sh` 現在建置映像、驗證 config、重建容器並等待健康檢查。
+`./guardroom/deploy/restart.sh` 現在建置映像、驗證 config、重建容器並等待健康檢查。
 映像使用鎖定的 server dependencies，不需 host 安裝 Python 或 uv。
 預設 Compose project 為 `nightwatch-guardroom`，不影響 shop-web 或其他 Compose project。
 
 ```sh
-./guardroom/restart.sh          # build + recreate，保留資料
-./guardroom/restart.sh --open   # 使用現有映像啟動，不重新 build
-./guardroom/restart.sh --close  # 停止，保留容器與資料
-docker compose -p nightwatch-guardroom -f guardroom/compose.yaml ps
-docker compose -p nightwatch-guardroom -f guardroom/compose.yaml logs -f guardroom
+./guardroom/deploy/restart.sh          # build + recreate，保留資料
+./guardroom/deploy/restart.sh --open   # 使用現有映像啟動，不重新 build
+./guardroom/deploy/restart.sh --close  # 停止，保留容器與資料
+docker compose -p nightwatch-guardroom -f guardroom/deploy/compose.yaml ps
+docker compose -p nightwatch-guardroom -f guardroom/deploy/compose.yaml logs -f guardroom
 curl http://127.0.0.1:9999/health/ready
 ```
 
 Host 預設僅發布 `127.0.0.1:9999`，container 內監聽 `0.0.0.0:9999`。
-可用 `PORT=10000 ./guardroom/restart.sh` 修改 host port；container 內仍是 9999。
+可用 `PORT=10000 ./guardroom/deploy/restart.sh` 修改 host port；container 內仍是 9999。
 Client 與 HTTP monitor 若使用自訂 port，也須明確設定 URL。
 
 | 掛載 | 用途 |
 | --- | --- |
-| host `guardroom/shop-web.config.json` → `/app/guardroom/shop-web.config.json`，唯讀 | 拓撲與聚合設定；可用 `GUARDROOM_CONFIG` 指定其他 host config |
-| host `control/tmp/` → `/app/control/tmp/`，唯讀 | 共用 Shop 的 JSONL；可用 `MONITOR_LOG_DIR` 指定已存在的 host 目錄 |
+| host `guardroom/configs/shop.json` → `/app/guardroom/configs/shop.json`，唯讀 | 拓撲與聚合設定；可用 `GUARDROOM_CONFIG` 指定其他 host config |
+| host `.run/monitor/` → `/app/.run/monitor/`，唯讀 | 共用 Shop 的 JSONL；可用 `MONITOR_LOG_DIR` 指定已存在的 host 目錄 |
 | named volume `nightwatch-guardroom_guardroom-state` → `/app/guardroom/.run/` | live checkpoint、歷史 snapshots、investigations.sqlite3 |
 
-Config 在容器內的位置固定，相對路徑以 `/app/guardroom/` 解析。自訂 config 建議保持
-`monitor_log=../control/tmp/monitor.jsonl`、`snapshot_path=.run/...`、`history.directory=.run/...`；
+Config 在容器內的位置固定，相對路徑以 `/app/guardroom/configs/` 解析。自訂 config 建議保持
+`monitor_log=../../.run/monitor/monitor.jsonl`、`snapshot_path=../.run/...`、`history.directory=../.run/...`；
 若使用其他容器路徑，必須自行增加對應掛載與寫入權限。
-Config 修改後重啟。舊 host 程序及 `guardroom/.run/`、`control/.data/` 資料不會自動遷移，
+Config 修改後重啟。舊 host 程序及 `guardroom/.run/`、`guardroom/.data/` 資料不會自動遷移，
 從舊部署切換前請先停止舊程序並備份、遷移所需資料。
 
 容器重啟／重建或 `docker compose down` 不會刪除 named volume；
@@ -39,7 +41,7 @@ Config 修改後重啟。舊 host 程序及 `guardroom/.run/`、`control/.data/`
 `GUARDROOM_PROJECT_NAME` 與 host port，避免共用 state volume。
 
 調查需要的 `NIGHTWATCH_LLM_API_KEY`／`OPENAI_API_KEY`、`NIGHTWATCH_LLM_MODEL` 等設定
-可透過 shell export 或 `guardroom/.env` 提供；不會自動載入 host 的 `control/.env`。
+可透過 shell export 或 `guardroom/deploy/.env` 提供；不會自動載入 host 的 `investigation-agent/.env`。
 預設 investigation graph URL 為容器內 `http://127.0.0.1:9999/api/graph`。
 不要將 API key 寫進 Dockerfile 或提交 `.env`。
 
@@ -52,7 +54,7 @@ Config 修改後重啟。舊 host 程序及 `guardroom/.run/`、`control/.data/`
 Shop 節點 warning／failing 不會令 Guard Room unhealthy。
 Compose 每 5 秒探測一次；**unhealthy 本身不會觸發自動重啟**，此版未加入 autoheal。
 
-現有 Compose 未注入 `NIGHTWATCH_SHOP_URL`，修復工具預設關閉。容器內 localhost 不是 host 的 Shop；目前修復工具只允許本機 HTTP origin，不能直接改填其他容器名稱。本機 CLI／host server 的啟用方式見 [修復設計](../control/SYSTEM_DESIGN.md)。
+現有 Compose 未注入 `NIGHTWATCH_SHOP_URL`，修復工具預設關閉。容器內 localhost 不是 host 的 Shop；目前修復工具只允許本機 HTTP origin，不能直接改填其他容器名稱。本機 CLI／host server 的啟用方式見 [修復設計](../investigation-agent/SYSTEM_DESIGN.md)。
 
 ## 監測拓撲與故障判定
 
@@ -97,7 +99,7 @@ request 失敗，order DB 仍可為 ok。
 
 ## 60 秒窗口與資料保存
 
-Monitor 送出單次呼叫的狀態、耗時與 log；Guard Room 每秒讀取共享 JSONL 的完整新行，按 [設定](shop-web.config.json) 映射與聚合。`finished`／`exception` 才計入完成次數，普通 ERROR log 不直接改健康。
+Monitor 送出單次呼叫的狀態、耗時與 log；Guard Room 每秒讀取共享 JSONL 的完整新行，按 [設定](configs/shop.json) 映射與聚合。`finished`／`exception` 才計入完成次數，普通 ERROR log 不直接改健康。
 
 | 窗口內完成事件 | 節點狀態 |
 | --- | --- |
@@ -115,4 +117,4 @@ JSONL writer 使用 POSIX flock 協調本機多程序寫入，消費端等待完
 
 Console 透過調查 state／stream 取得 graph、歷史調查與報告，另以 `/events` 讀即時 log。Live `/events` 也包含相容舊畫面的 state／graph／incident；每 2 秒的 ping 含 `server_now`。Monitor log 不提供歷史續傳；調查串流有獨立 cursor。
 
-HTTP 接收使用 `POST /api/logs`，格式以 [logs.py](../control/server/logs.py) 為準；不是 OTLP receiver。必須使用單一 uvicorn worker，不同 instance 不可共寫 state。API 無身分驗證，預設僅發布 localhost。詳細端點見 [server README](../control/server/README.md)，Monitor 使用方式見 [monitor README](../control/monitor/README.md)。
+HTTP 接收使用 `POST /api/logs`，格式以 [logs.py](backend/logs.py) 為準；不是 OTLP receiver。必須使用單一 uvicorn worker，不同 instance 不可共寫 state。API 無身分驗證，預設僅發布 localhost。詳細端點見 [server README](backend/README.md)，Monitor 使用方式見 [monitor README](../monitor/README.md)。
