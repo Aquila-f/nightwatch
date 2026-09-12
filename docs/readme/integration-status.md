@@ -2,13 +2,13 @@
 
 Snapshot: 2026-09-12. This document summarizes the existing local integration audit and component documentation. It is a documentation baseline, not a new end-to-end test result. 本文件整理既有本機盤點與元件說明，代表文件基準，不是這次重新執行的端到端驗證。
 
-The source audit is [INTEGRATION.md](../../INTEGRATION.md), originally recorded in `181944c` and now included on master through MR #27. The tables below retain that audit baseline. MR #27 additionally introduced opt-in local demo-fault tools, so its repair updates below supersede the older absence-of-repair statements.
+The source audit is [INTEGRATION.md](../../INTEGRATION.md), originally recorded in `181944c` and now included on master through MR #27. The tables below also incorporate the Docker and checkout-monitoring integration. MR #27 additionally introduced opt-in local demo-fault tools, so its repair updates below supersede the older absence-of-repair statements.
 
-來源是 [INTEGRATION.md](../../INTEGRATION.md)，最初記錄於 `181944c`，現已隨 MR #27 納入主線。下表保留當時的盤點基準；MR #27 另加入可明確啟用的本機演練故障工具，因此以下更新取代舊盤點中完全沒有修復接線的敘述。
+來源是 [INTEGRATION.md](../../INTEGRATION.md)，最初記錄於 `181944c`，現已隨 MR #27 納入主線。下表已納入 Docker 與結帳監測整合；MR #27 另加入可明確啟用的本機演練故障工具，因此以下更新取代舊盤點中完全沒有修復接線的敘述。
 
-設定 `NIGHTWATCH_SHOP_URL` 後，Agent 可使用 `get_demo_faults`、`deactivate_demo_fault` 與 `check_shop_health`，限指定本機店面的演練操作；通用修復、人工批准與可信恢復驗證仍未完成。解除故障不等於成功結帳或服務恢復，完整限制見 [SYSTEM_DESIGN.md](../../control/SYSTEM_DESIGN.md)。
+Docker Compose 預設未啟用修復工具，容器 localhost 無法沿用 host Shop URL。本機 CLI／host server 設定 `NIGHTWATCH_SHOP_URL` 後，Agent 可使用 `get_demo_faults`、`deactivate_demo_fault` 與 `check_shop_health`，限指定本機店面的演練操作；通用修復、人工批准與可信恢復驗證仍未完成。永久故障的 null 租期與數值租期皆受支援。解除故障不等於成功結帳或服務恢復，完整限制見 [SYSTEM_DESIGN.md](../../control/SYSTEM_DESIGN.md)。
 
-With `NIGHTWATCH_SHOP_URL` configured, the agent can inspect/deactivate demo faults and query health in the designated local storefront. General repair, approval, and trustworthy recovery verification remain incomplete. Clearing a fault does not prove successful checkout or service recovery; see [SYSTEM_DESIGN.md](../../control/SYSTEM_DESIGN.md).
+Docker Compose leaves these tools disabled; container localhost does not reach the host storefront. For a host CLI/server with `NIGHTWATCH_SHOP_URL` configured, the agent can inspect/deactivate demo faults and query health in the designated local storefront. General repair, approval, and trustworthy recovery verification remain incomplete. Null leases for persistent faults are supported alongside numeric leases. Clearing a fault does not prove successful checkout or service recovery; see [SYSTEM_DESIGN.md](../../control/SYSTEM_DESIGN.md).
 
 ## Available / 已有實作
 
@@ -20,17 +20,17 @@ With `NIGHTWATCH_SHOP_URL` configured, the agent can inspect/deactivate demo fau
 | Logs / 日誌 | `POST /api/logs` accepts `nightwatch.log.v1`; `GET /api/debug/logs` reads recent retained logs; `/events` streams log events. Storefront ingestion currently uses shared JSONL. 商店預設以共享 JSONL 接入。 |
 | Investigation / 調查 | Manual creation, persistent anomaly detection, saved events/context/evidence, structured reports, and backend exports. 支援手動／自動觸發、事件與對話保存、結構化報告及後端匯出。 |
 | Agent tools / 工具 | `get_graph`, `list_graph_snapshots`, `get_node_detail`, `search_logs`, `submit_report`. Model/source errors are surfaced without automatic replay fallback. 真模型或來源失敗會顯示錯誤，不自動切換錄影。 |
-| Console / 介面 | Live investigation state, history, details, events, context, and SSE. 調查工作區可讀即時與歷史資料。 |
+| Console / 介面 | Live investigation state, history, details, submitted reports, context, and SSE. Background tabs pause streams and resume on visibility. 調查可依 cursor 續接；monitor log 不補送背景期間資料。 |
 
 ## Gaps / 尚待對接
 
 | Gap / 缺口 | Consequence / 影響 |
 | --- | --- |
-| Graph coverage / 圖覆蓋 | Config still maps `shop.db.query`, which the current storefront does not emit; `shop.order.health` has no node mapping. Catalog/cart and checkout need aligned instrumentation. 店面故障不保證能被目前節點觀察到。 |
+| Graph coverage / 圖覆蓋 | Six nodes and three edges cover health, products, order DB reads, and checkout request → logic → DB writes. Catalog/cart internals remain partially covered; `shop.order.health` has no separate node mapping. 結帳故障已可觀測，仍須實際送出請求才產生訊號；無完成事件的 60 秒窗口顯示 unknown。 |
 | Fault control / 故障控制 | Legacy control fault routes remain unavailable; opt-in agent demo-fault tools are connected. Console's proxy permits investigation creation but not fault-control POSTs. Agent 可明確啟用本機解除，舊故障介面仍未串接。 |
 | Repair / 修復 | Local demo-fault deactivation is available when explicitly enabled; no general actuator, approval-to-execution flow, post-repair observation window, or trusted recovery baseline. 可解除本機演練故障，尚無通用修復與成效驗證閉環。 |
 | Measurements / 量測 | No connected Prometheus/Jaeger or independent health probe. `saturation=null`; edge measurements are `null` with `observed=false`. `alive` means monitor events occurred in the window. 缺失量測不是零，沒有事件不代表服務已死。 |
-| Readiness / 就緒狀態 | Legacy readiness/capabilities do not describe all working investigation tools. `ready=false` and `model.available=false` are not sufficient to diagnose model availability. 不能只靠這些旗標判斷模型一定不可用。 |
+| Readiness / 就緒狀態 | Docker `/health/ready` checks graph/history processing. Legacy readiness/capabilities do not describe all working investigation tools. `ready=false` and `model.available=false` are not sufficient to diagnose model availability. 不能只靠這些旗標判斷模型一定不可用。 |
 | Log history / 日誌歷史 | `search_logs` filters a bounded recent batch, not a complete historical archive. 查無資料不能推論沒有故障。 |
 | Experiment audit / 演練稽核 | Investigation reports exist; a complete fault/approval/repair/verification timeline does not. Console has no dedicated export action yet. 調查報告不同於完整修復稽核。 |
 

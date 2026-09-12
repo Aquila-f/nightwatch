@@ -7,32 +7,35 @@
 從 repo 根目錄執行：
 
 ```sh
-bash guardroom/restart.sh
+./guardroom/restart.sh
 ```
 
-或安裝既有鎖定依賴後，直接啟動單一 worker：
+此命令使用 Docker Compose，預設 port 9999。若要在 host 開發，先以 `./guardroom/restart.sh --close` 停止容器，再安裝既有鎖定依賴並啟動單一 worker：
 
 ```sh
 uv sync --project control/server --locked --offline
-control/server/.venv/bin/python -m uvicorn main:app --app-dir control/server --host 127.0.0.1 --port 8001
+control/server/.venv/bin/python -m uvicorn main:app --app-dir control/server --host 127.0.0.1 --port 9999
 ```
 
 | 變數 | 用途 |
 | --- | --- |
 | `GUARDROOM_CONFIG` | 預設 `guardroom/shop-web.config.json`；控制 monitor→node 對應與保存路徑 |
-| `NIGHTWATCH_GRAPH_URL` | 調查用來源，預設 `http://127.0.0.1:8001/api/graph`；改 server 埠時同步設定 |
+| `NIGHTWATCH_GRAPH_URL` | 調查用來源，預設 `http://127.0.0.1:9999/api/graph`；改 server 埠時同步設定 |
 | `NIGHTWATCH_INVESTIGATION_DB` | 預設 `control/.data/investigations.sqlite3`，另有排他鎖檔 |
 | `NIGHTWATCH_MOCK_DATA` | `0`（預設）或 `1`；只切換舊前端 API，不會將 investigation API 換成假模型 |
 
 可選 `NIGHTWATCH_SHOP_URL=http://127.0.0.1:8005`，授權 agent 解除該本機店面的演練故障；工具與驗證邊界見 [system design](../SYSTEM_DESIGN.md)。既有 `/api/faults*` 路由不因此啟用。
 
-模型設定見 [control README](../README.md)。server 不自行載入 dotenv。`/docs`、`/openapi.json` 列出實際路由。
+Compose 將調查 SQLite 放在 state volume 的 `/app/guardroom/.run/investigations.sqlite3`，重啟保留。Docker 內的 localhost 指容器自身，現有 Compose 未注入 `NIGHTWATCH_SHOP_URL`，修復工具預設關閉；啟用需另行設計符合本機 origin 限制的連線方式。
+
+模型設定見 [control README](../README.md)。server 不自行載入 dotenv；Compose 從 `guardroom/.env` 讀取並注入環境變數。`/docs`、`/openapi.json` 列出實際路由。
 
 ## 可用 API
 
 | 路徑 | 行為 |
 | --- | --- |
 | `GET /health` | HTTP 服務存活 |
+| `GET /health/ready` | snapshot 與歷史排程就緒；獨立於被監控節點的健康 |
 | `GET /api/graph` | 最新真實快照；`timestamp` 讀歷史，`state=normal/problem` 明確讀假圖 |
 | `GET /api/graph/snapshots` | `limit`、`before_seq` 分頁列出保留快照 |
 | `POST /api/logs` | 接收 `nightwatch.log.v1` 日誌，去重、保存並推播 |

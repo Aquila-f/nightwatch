@@ -115,7 +115,8 @@ def main():
             assert detail["status"] == "completed" and actions, detail
             action = actions[-1]["result"]
             assert action["delete_sent"] and action["fault_control_cleared"], action
-            assert action["before"]["active"]["remaining_seconds"] > 0
+            remaining = action["before"]["active"]["remaining_seconds"]
+            assert remaining is None or remaining > 0
             status, state = request(args.shop_url, "/api/demo-faults")
             assert status == 200 and state.get("active") is None
             owned_fault = None

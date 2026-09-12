@@ -72,3 +72,9 @@ control/server/.venv/bin/python control/acceptance/demo_repair.py \
 修復兩輪合併為 82.48%。第一輪第一個請求 cache=0，第二輪第一個請求 88.17%，顯示同設定的前綴仍有重用。原版與修復調查的回合數、工具輸出量和時間不同，以上是實際樣本，不能當成受控效能回歸結論，也不能宣稱命中率與原版相同。新增逐輪數據可追查某輪是否讀入大量新觀測。
 
 執行中的實際程式完成兩個修復案例；另以既有快取中的 hatchling 離線建出 wheel，確認包含 actuator 與 JSON schema，從解開的 wheel 實際執行 graph／fault／health 讀取並確認錯誤身份在 DELETE 前被拒絕。完整模型修復是從 worktree 原始碼啟動；沒有再從 wheel 重跑整個模型案例。既有 23 項測試通過。未驗證自動 detector、checkout_delay 的完整模型流程、多人並發解除及長時間 cache 穩定性。
+
+## 永久故障與 Docker 部署
+
+現行 Shop 的 `lease_seconds`、`remaining_seconds` 為 `null`，表示故障持續到手動解除。修復工具同時接受永久故障與舊版數值租期；只有數值小於等於零時才拒絕解除。解除前仍須讀取並核對 `fault_id`、`started_at`，每次調查最多嘗試一次 DELETE。
+
+現有 Docker Compose 未注入 `NIGHTWATCH_SHOP_URL`，因此預設關閉修復工具。容器內 localhost 指容器自身，不能直接套用 host 的 Shop URL；`DemoRepair` 也不接受一般跨容器 hostname。本機 CLI／host server 可依實際 Shop 埠明確設定，例如 `http://127.0.0.1:8001`。

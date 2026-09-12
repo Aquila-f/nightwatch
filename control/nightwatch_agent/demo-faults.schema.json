@@ -52,7 +52,7 @@
               "title": "Expires At"
             },
             "remaining_seconds": {
-              "type": "number",
+              "type": ["number", "null"],
               "title": "Remaining Seconds"
             },
             "status": {
@@ -76,7 +76,7 @@
       ]
     },
     "lease_seconds": {
-      "type": "integer",
+      "type": ["integer", "null"],
       "title": "Lease Seconds"
     },
     "delay_seconds": {

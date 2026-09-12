@@ -44,7 +44,7 @@
 
 依 [2026-09-12 對接盤點](docs/readme/integration-status.md)，目前已串起「店面請求 → 部分 Monitor → Guard Room → 調查／報告」。自動偵測會在同一節點連續三次出現符合新鮮度條件的 `warning`／`failing` 時觸發調查；也可手動建立。
 
-**監測尚未覆蓋拆分後的所有服務，因此店面的每張故障卡不保證會觸發調查。** Console 尚無批准修復入口；設定 `NIGHTWATCH_SHOP_URL` 後，Agent 可解除指定本機店面的演練故障，但這不等於業務恢復。看到調查報告或 mock 的 recovered 狀態，都不代表服務已被修好。
+**結帳 request、logic 與 DB write 已納入六節點拓撲；catalog／cart 內部操作仍未完整覆蓋。** 故障卡啟用後需實際結帳才產生觀測；是否自動開案仍取決於連續異常與新鮮度條件。 Console 尚無批准修復入口；設定 `NIGHTWATCH_SHOP_URL` 後，Agent 可解除指定本機店面的演練故障，但這不等於業務恢復。看到調查報告或 mock 的 recovered 狀態，都不代表服務已被修好。
 
 ## 架構
 
@@ -75,7 +75,7 @@
 
 ## 快速開始
 
-以下命令從 repository 根目錄執行。需要 Git、Docker + Compose、GNU Make、Python 與 `uv`；各 Python 元件版本依自己的專案設定，Monitor 最低為 Python 3.11，商店容器使用 Python 3.12。Console 使用標準函式庫，不需 npm 安裝。
+以下命令從 repository 根目錄執行。需要 Git、Docker + Compose、Python 3、curl 與 lsof。Guard Room 與商店依賴在容器內安裝；商店容器使用 Python 3.12，Guard Room 使用 Python 3.13。Console 使用標準函式庫，不需 npm 安裝。
 
 首次依賴安裝、映像下載與 Docker build 可能需要網路。預先備妥依賴與映像後，本機服務與明確選取的錄影可離線使用；**真實 AI 調查需要可達的模型端點與金鑰**，自動偵測也可能觸發模型呼叫。
 
@@ -83,38 +83,37 @@
 git clone https://github.com/davidleitw/nightwatch-hack.git
 cd nightwatch-hack
 
-# 建置並啟動商店的五個容器。
-make -C shop-web up
+# 建置並重啟 Shop、Guard Room 與 Console。
+./restart.sh
 
-# 啟動 Guard Room，安裝鎖定依賴並驗證設定。
-bash guardroom/restart.sh
-
-# 建置 Console，並在此終端提供 production 建置產物。
-python3 console/build.py
-python3 console/serve.py --port 4173 --control-url http://127.0.0.1:8001
+# 使用現有 Docker 映像，或停止全部服務並保留資料。
+# ./restart.sh --open
+# ./restart.sh --close
 ```
+
+腳本沿用既有部署的 host port；下表是首次部署預設值。可明確覆寫，例如 `FRONTEND_PORT=8081 BACKEND_PORT=8001 PORT=9999 CONSOLE_PORT=4173 ./restart.sh`。Console 在 host 背景執行，PID／log 在 `.run/`。重啟會中斷連線與進行中的調查，保留 Docker volume 與 monitor log；詳細操作見 [部署說明](guardroom/README.md)。
 
 | 入口 | URL | 用途 |
 | --- | --- | --- |
 | 商店 | http://127.0.0.1:8080 | 商品、購物袋與示範訂單 |
 | 故障演練 | http://127.0.0.1:8080/#/events | 三張作用於 order 的故障卡 |
 | Console | http://127.0.0.1:4173 | 即時調查工作區 |
-| Guard Room API | http://127.0.0.1:8001/docs | API 文件 |
+| Guard Room API | http://127.0.0.1:9999/docs | API 文件 |
 | Storefront API | http://127.0.0.1:8000/docs | Gateway API 文件 |
 
 在另一個終端確認服務回應：
 
 ```sh
 curl --fail-with-body http://127.0.0.1:8080/api/health
-curl --fail-with-body http://127.0.0.1:8001/health
-curl --fail-with-body http://127.0.0.1:8001/api/graph
+curl --fail-with-body http://127.0.0.1:9999/health
+curl --fail-with-body http://127.0.0.1:9999/api/graph
 ```
 
-瀏覽商品以產生被監測的請求；空的觀測窗口可能顯示 unknown。商店沒有金流或物流。Guard Room 使用 **單一 worker**；更換埠號時也要調整 `NIGHTWATCH_GRAPH_URL`。
+瀏覽商品以產生被監測的請求；60 秒窗口內沒有完成事件時顯示 unknown，這不表示恢復。商店沒有金流或物流。Guard Room 使用 **單一 worker**；Docker 內部固定為 9999，修改 host port 不必改容器內的 graph URL；host CLI 則需指向實際發布埠。
 
 ### 啟用 AI 調查
 
-啟動 Guard Room **之前**，在同一個 shell 設定 `NIGHTWATCH_LLM_API_KEY` 或 `OPENAI_API_KEY`，前者優先。可用 `NIGHTWATCH_LLM_ENDPOINT` 與 `NIGHTWATCH_LLM_MODEL` 選擇部署所需端點及模型；預設值與 CLI 選項見 [Agent 說明](control/README.md)。HTTP server 只讀程序環境，不自行載入 `.env`。
+啟動 Guard Room **之前**，在同一個 shell 設定 `NIGHTWATCH_LLM_API_KEY` 或 `OPENAI_API_KEY`，前者優先。可用 `NIGHTWATCH_LLM_ENDPOINT` 與 `NIGHTWATCH_LLM_MODEL` 選擇部署所需端點及模型；預設值與 CLI 選項見 [Agent 說明](control/README.md)。也可放在 Git 忽略的 `guardroom/.env`，由 Compose 注入；HTTP server 本身不載入 dotenv，CLI 使用的 `control/.env` 不會自動套用到容器。
 
 只想先看介面？建置 Console 後，在另一埠明確開啟離線 mock；此模式不能建立真實調查。
 
@@ -147,18 +146,18 @@ Python 服務可用 `@monitor(MonitorConfig(...))` 包住要觀測的函式，�
 真實調查範例，需要上方的模型設定：
 
 ```sh
-curl --fail-with-body http://127.0.0.1:8001/api/investigations \
+curl --fail-with-body http://127.0.0.1:9999/api/investigations \
   -H 'Content-Type: application/json' \
   -d '{"request_id":"readme-manual-001","trigger":{"source":"manual","reason":"Inspect current service anomalies"}}'
 ```
 
-重送相同 `request_id` 與內容會取回同一調查；新調查請換 ID，重試則保留原 ID 及內容。同時只執行一件調查。報告尚未結案回 `409`，未知 ID 回 `404`。SSE 支援 `after` 或 `Last-Event-ID` 續傳，完整介面見 [HTTP API 說明](control/server/README.md)。
+重送相同 `request_id` 與內容會取回同一調查；新調查請換 ID，重試則保留原 ID 及內容。同時只執行一件調查。報告尚未結案回 `409`，未知 ID 回 `404`。調查 SSE 支援 `after` 或 `Last-Event-ID` 續傳；monitor log 不補送，完整介面見 [HTTP API 說明](control/server/README.md)。
 
 ### 3. 對接商店
 
 外部 client 使用 gateway `:8000`，或 Nginx 的 `:8080/api/`；catalog、cart、order 僅在 Compose 內部開放。商品、購物車、checkout 與 `Idempotency-Key` 的完整規則見 [商店 API 契約](shop-web/docs/API.md)。
 
-故障卡使用商店的 **`GET/POST/DELETE /api/demo-faults`**。設定 `NIGHTWATCH_SHOP_URL` 後，Agent 可透過 `get_demo_faults`、`deactivate_demo_fault`、`check_shop_health` 查詢及解除本機演練故障，詳見 [演練修復邊界](control/SYSTEM_DESIGN.md)。舊 control `/api/faults*` 及批准操作在 live 模式仍回 `503`，兩套端點不可互換。
+故障卡使用商店的 **`GET/POST/DELETE /api/demo-faults`**。永久故障的租期為 null，修復工具支援此格式。Docker Compose 預設未啟用修復工具，容器 localhost 也不指向 host 的 Shop。本機 CLI／host server 設定 `NIGHTWATCH_SHOP_URL` 後，Agent 可透過 `get_demo_faults`、`deactivate_demo_fault`、`check_shop_health` 查詢及解除本機演練故障，詳見 [演練修復邊界](control/SYSTEM_DESIGN.md)。舊 control `/api/faults*` 及批准操作在 live 模式仍回 `503`，兩套端點不可互換。
 
 ## 未來工作
 
@@ -166,7 +165,7 @@ curl --fail-with-body http://127.0.0.1:8001/api/investigations \
 
 | 優先 | 下一步 | 完成後的價值 |
 | --- | --- | --- |
-| 1 | 對齊 catalog／cart／order 的 Monitor 與圖設定 | 故障可對應到實際受影響服務 |
+| 1 | 補齊 catalog／cart 內部監測與 order health 映射 | 故障可對應到實際受影響服務 |
 | 2 | 完善演練故障控制的並行操作與生命週期 | 補足已接通的本機解除工具之操作限制 |
 | 3 | 人工批准、修復執行、修復後觀測窗口 | 用證據確認修復成效 |
 | 4 | 補齊基線、指標、trace 與獨立 health probe | 讓調查取得更完整的觀測資料 |
@@ -182,10 +181,10 @@ curl --fail-with-body http://127.0.0.1:8001/api/investigations \
 | [control/monitor/](control/monitor/README.md) | Python 函式監測、JSONL 與 HTTP sink |
 | [control/](control/README.md) | AI 調查工具、模型設定與 CLI |
 | [control/server/](control/server/README.md) | Guard Room HTTP API、SQLite、SSE |
-| [guardroom/](guardroom/README.md) | 本機啟動與監測映射設定 |
+| [guardroom/](guardroom/README.md) | Docker 部署與監測映射設定 |
 | [console/](console/README.md) | 真實調查工作區與明確選用的錄影 |
 | [對接狀態](docs/readme/integration-status.md) | 真實對接、mock 與限制的詳細盤點 |
-| [INTEGRATION.md](INTEGRATION.md) | 主線保留的原始盤點紀錄 |
+| [INTEGRATION.md](INTEGRATION.md) | 目前實作與既有驗證紀錄 |
 | `contracts/schemas/`、`contracts/fixtures/` | 程式仍載入的 schema 與離線錄影；舊架構說明已移除 |
 | `gate/` | PR 與 harness 工具，獨立於網站執行流程 |
 

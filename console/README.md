@@ -8,12 +8,18 @@
 
 ```sh
 python3 console/build.py
-python3 console/serve.py --port 4173 --control-url http://127.0.0.1:8001
+python3 console/serve.py --port 4173 --control-url http://127.0.0.1:9999
 ```
 
 開啟 `http://127.0.0.1:4173/`。server 只供應 `dist/` 建置產物，代理 `/api/*` GET、`/events` 與建立調查 POST。其他 POST 回 405；上游失敗顯示錯誤，不切換成 mock。
 
-`NIGHTWATCH_CONTROL_URL` 可設定上游；未設 URL 時使用 `--control-port`（預設 8001）。
+`NIGHTWATCH_CONTROL_URL` 可設定上游；未設 URL 時使用 `--control-port`（預設 9999）。
+
+## 報告與分頁連線
+
+調查事件支援 `report.submitted`，與 `submit_report` 工具呼叫配對並顯示「已提交報告」。結案報告優先讀取 `investigation_report`，相容舊 `agent_report`。
+
+背景分頁會暫停調查與 monitor log 兩條 SSE，避免多分頁占滿 HTTP 連線而讓歷史／事件讀取逾時。回到前景時先刷新資料，再由既有 cursor 恢復調查串流；monitor log 不補送背景期間的缺漏。更新後請重新整理已開啟的舊分頁。
 
 ## 明確啟用的示範
 

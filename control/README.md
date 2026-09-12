@@ -9,14 +9,14 @@
 ```sh
 bash control/run-agent.sh --describe-context
 bash control/run-agent.sh --model
-bash control/run-agent.sh --graph-url http://127.0.0.1:8001/api/graph --model
+bash control/run-agent.sh --graph-url http://127.0.0.1:9999/api/graph --model
 ```
 
 `--describe-context` 只讀 graph 並列出 prompt／工具，不呼叫模型。`--model` 使用真實模型，需要模型服務可達與金鑰。腳本以 `uv run --locked --offline` 執行，依序選 `control/.env` 或根目錄 `.env`，不安裝新依賴。
 
 | 變數 | 行為 |
 | --- | --- |
-| `NIGHTWATCH_GRAPH_URL` | 預設 `http://127.0.0.1:8001/api/graph`；CLI `--graph-url` 優先 |
+| `NIGHTWATCH_GRAPH_URL` | 預設 `http://127.0.0.1:9999/api/graph`；CLI `--graph-url` 優先 |
 | `NIGHTWATCH_LLM_API_KEY`、`OPENAI_API_KEY` | 前者優先 |
 | `NIGHTWATCH_LLM_ENDPOINT` | 預設 `https://api.openai.com/v1/responses` |
 | `NIGHTWATCH_LLM_MODEL` | 預設 `gpt-6-astra`；CLI `--model MODEL` 優先 |

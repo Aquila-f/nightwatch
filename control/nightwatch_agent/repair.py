@@ -18,7 +18,7 @@ from .loop import Observation, encode
 EMPTY = {"type": "object", "properties": {}, "additionalProperties": False}
 REPAIR_TOOLS = [
     {"name": "get_demo_faults", "parameters": EMPTY,
-     "description": "Read the configured shop's GET /api/demo-faults. Returns cards, active fault (or null), lease_seconds and delay_seconds. This is explicit demo-control state, not independent diagnostic evidence. Read before attempting deactivation; expired leases do not prove agent repair."},
+     "description": "Read the configured shop's GET /api/demo-faults. Returns cards, active fault (or null), lease_seconds and delay_seconds. This is explicit demo-control state, not independent diagnostic evidence. Read before attempting deactivation; null lease_seconds / remaining_seconds means the fault has no automatic expiry; expired numeric leases do not prove agent repair."},
     {"name": "deactivate_demo_fault", "parameters": {
         "type": "object", "additionalProperties": False,
         "required": ["fault_id", "started_at"], "properties": {
@@ -88,7 +88,8 @@ class DemoRepair:
         if not active or any(active.get(k) != args[k] for k in ("fault_id", "started_at")):
             self.observed = None
             raise ValueError("Active fault changed or expired; DELETE was not sent")
-        if active["remaining_seconds"] <= 0:
+        remaining = active["remaining_seconds"]
+        if remaining is not None and remaining <= 0:
             raise ValueError("Fault lease expired; DELETE was not sent")
         self.attempted = True
         response = self._request("/api/demo-faults", "DELETE")
@@ -103,4 +104,3 @@ class DemoRepair:
         return Observation(result={"observed_at": datetime.now(timezone.utc).isoformat(), **result},
                            source="shop_demo_api", t=int(time.monotonic() - self.started),
                            summary_zh=f"已執行 {name}；此為店面演練 API 結果，業務恢復需獨立驗證。")
-

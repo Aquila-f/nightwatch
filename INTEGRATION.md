@@ -1,6 +1,6 @@
 # 對接與 mock 盤點
 
-盤點日期：2026-09-12。以下以本次讀到的程式碼與隔離環境驗證為準，沒有沿用舊契約的完成宣稱。
+盤點日期：2026-09-12。目前狀態已更新至 Guard Room Docker／結帳監控整合；末尾保留 #27 文件整理時的驗證紀錄，該紀錄不代表本次整合驗證。
 
 ## 做了什麼
 
@@ -17,19 +17,19 @@
 | 日誌 | `POST /api/logs`、`GET /api/debug/logs`、`/events` 的 log 事件已有實作；店面目前主要經共享 JSONL 接入 | [logs.py](control/server/logs.py)、[frontend_live.py](control/server/frontend_live.py) |
 | 調查 | `/api/investigations` 建立、列表、state、stream、detail、events、report、snapshots、context、export 都有處理程式，資料保存於 SQLite | [investigation_api.py](control/server/investigation_api.py)、[investigation_store.py](control/server/investigation_store.py) |
 | 自動偵測 | 三次連續新鮮 warning／failing 觸發調查，SQLite 旗標防止同一段異常重複開案 | [detector.py](control/server/detector.py)、[manager](control/server/investigation_api.py) |
-| Agent 工具 | live 模式讀 graph、歷史索引、節點詳情與近期 log，再提交結構化報告；真模型失敗不自動退回錄影 | [graph.py](control/nightwatch_agent/graph.py)、[loop.py](control/nightwatch_agent/loop.py) |
-| Console live 工作區 | 建立調查、讀 state／detail／events／context、接收兩條 SSE；上游失敗會顯示錯誤 | [investigations.js](console/src/investigations.js)、[serve.py](console/serve.py) |
+| Agent 工具 | live 模式讀 graph、歷史索引、節點詳情與近期 log，再提交結構化報告；明確設定本機 `NIGHTWATCH_SHOP_URL` 可解除演練故障並讀 health，Docker 預設未啟用 | [graph.py](control/nightwatch_agent/graph.py)、[loop.py](control/nightwatch_agent/loop.py) |
+| Console live 工作區 | 建立調查、讀 state／detail／events／context、顯示提交報告；背景分頁暫停兩條 SSE，前景刷新後續接 | [investigations.js](console/src/investigations.js)、[serve.py](console/serve.py) |
 
 ### 尚未對接／未實作
 
 | 優先 | 缺口 | 實際結果與下一個接點 |
 | --- | --- | --- |
-| 高 | control → 店面故障控制 | `LiveStore.execute()` 一律 503。店面有 `/api/demo-faults`，但 control 沒有呼叫它；前端 proxy 也只允許建立調查 POST。需要先串接真實故障操作、錯誤與生命週期。 |
-| 高 | 拆服務後的監測拓樸 | [設定](guardroom/shop-web.config.json) 仍宣告 `shop.db.query`，現行店面程式沒有此 monitor；order 發送 `shop.order.health` 卻沒有 node 對應。cart／catalog 只有一般 request log，結帳也沒有對應 Monitor。店面的故障不保證會被目前三個節點觀察到。 |
-| 高 | 批准、修復、修復驗證 | 沒有真實 actuator，也沒有修復後觀測窗口、可信基線或根因稽核。mock 的 recovered 不能代表服務已修復。 |
+| 高 | control → 店面故障控制 | `LiveStore.execute()` 一律 503。前端 proxy 只允許建立調查 POST；Agent 可選用的 DemoRepair 已呼叫 Shop `/api/demo-faults`，但不會啟用這些舊 UI 路由。 |
+| 高 | 拆服務後的監測拓樸 | [設定](guardroom/shop-web.config.json) 已有六個節點、三條連線；gateway request → order logic → DB write 可觀察結帳故障，order health 的 DB 讀取發送 `shop.db.query`。catalog／cart 內部操作仍未完整監測，`shop.order.health` 未映射為獨立節點。 |
+| 高 | 批准、修復、修復驗證 | 已有明確啟用的本機演練故障解除工具，尚無完整批准流程、通用修復或業務恢復驗證。永久故障與數值租期皆可讀取；解除控制不等於結帳恢復。 |
 | 中 | 完整實驗報告 | 舊 incident report／timeline 在 live 回 503；已有 investigation report 是調查結果，沒有注入真相、基線比較、修復驗證。 |
-| 中 | 指標／trace／health | Prometheus 與 Jaeger 固定不可用；saturation=null，trend=na，edge 量測=null、observed=false。alive 只是窗口內有 monitor 事件，沒有獨立 health probe 或合成顧客訂單率。見 [GraphStore](control/server/graph_state.py)。 |
-| 中 | readiness／capabilities | readiness 永遠 ready=false；除 logstore 外都是未接／未探測，model.available=false 不代表模型一定不可用。capabilities.tools/actions 為空、budget 為零，尚未反映 investigation 的真實工具。見 [LiveStore](control/server/frontend_live.py)。 |
+| 中 | 指標／trace／health | Prometheus 與 Jaeger 固定不可用；saturation=null，trend=na，edge 量測=null、observed=false。alive 只是窗口內有 monitor 事件，graph 沒有獨立 health probe 或合成顧客訂單率；Agent 可選用 Shop health 工具，但它不量測結帳恢復。見 [GraphStore](control/server/graph_state.py)。 |
+| 中 | readiness／capabilities | 舊 `/api/readiness` 永遠 ready=false；Docker 用的 `/health/ready` 另行檢查 snapshot／history 排程；除 logstore 外都是未接／未探測，model.available=false 不代表模型一定不可用。capabilities.tools/actions 為空、budget 為零，尚未反映 investigation 的真實工具。見 [LiveStore](control/server/frontend_live.py)。 |
 | 中 | 全歷史日誌 | `search_logs` 只篩選最近抓回的有限批次；checkpoint 最多保留所有節點合計 10000 筆，沒有完整歷史分頁。不能從查無資料推論沒有故障。 |
 | 低 | 對話、OTLP、Grafana 告警 | 沒有 chat、OTLP receiver 或 Grafana webhook 路由；目前日誌入口是 `/api/logs`。這些是未實作，不是正在用 mock 回應。 |
 | 低 | 前端的專用報告／匯出入口 | 後端 `report`／`snapshots`／`export` 已存在，但目前 console 主要讀 detail／events／context，沒有獨立匯出操作。 |
@@ -71,16 +71,22 @@
 
 店面 UI 的三張故障卡文字是靜態定義，狀態與操作仍走真實 API；這與 control mock 的五張舊 OTel 卡是兩套功能。
 
-### 本次清理
+### 本分支的部署與觀測行為
+
+Guard Room 使用 Docker Compose，預設 port 9999，根目錄 `./restart.sh` 一併啟動 Shop 與 Console。Graph 以 60 秒窗口聚合，沒有新完成事件時節點變為 unknown，不表示服務恢復。容器 readiness 檢查 graph／history 排程，與舊 `/api/readiness` 分開。
+
+永久故障的租期欄位可為 null；本機修復工具接受此格式，仍核對故障身分並限制一次 DELETE。Docker Compose 預設不注入修復工具的啟用設定，容器 localhost 不能直接連到 host Shop。
+
+### #27 文件整理紀錄
 
 - 移除舊 OTel 契約說明、舊編號任務／封存 stub、過期實作規格、重複變更日誌與 root Hello World 程式。
 - 移除不再對應現行服務的三個契約檢查腳本及其舊 manifest／cards／adapter、未使用範例和 console schema 草稿；保留程式與既有測試仍載入的 schemas、錄影、monitor log schema 及 agent-report 範例。
 - 重寫 root、control、server、console、guardroom README，啟動方式與限制直接來自目前程式。
 - 移除 `install_frontend()` 已沒有呼叫端的空 store／log-only 分支；抽出共用 UTC 時間函式，讓 live 不再依賴 mock 模組取得時間。
 - 假設：仍有明確入口或測試使用的 mock／錄影不屬於廢碼，因此保留。現行 shop API 文件、Monitor 使用說明與 gate 工具仍有用途，也保留。
-- 本次列出缺口，沒有實作自動修復或更改店面監測範圍。既有 gate 修改、未追蹤紀錄與資料未納入本次提交。
+- 此段記錄文件整理時的清理範圍；後續 #27 加入可選用的 DemoRepair，本分支另加入結帳監測與 Docker 部署。
 
-## 依據什麼驗證的
+## #27 文件整理時的驗證紀錄
 
 - `rg` 與逐段讀程式，核對 router、HTTP client、前端 fetch／SSE、環境開關、Monitor 發送點及 JSONL 設定；以上表格的程式連結是主要依據。
 - `PYTHONPATH=control control/.venv/bin/python -m unittest discover -s control/tests -v`：23 tests，OK。涵蓋框架與 Monitor 行為；模型部分使用替身。
@@ -91,7 +97,7 @@
 - 同次驗證確認 console 從建置產物提供首頁／JS 並代理調查 state／SSE；不允許的故障 POST 回 405。control mock 的注入／批准回 202、報告 200；console mock 可讀 state／錄影、收到 SSE，但建立調查回 503。店面故障狀態前後相同。最後輸出 PASS 與 All verification services stopped。
 - `git diff --check` 無輸出；Python 檢查現行文件的本機 Markdown 連結，缺失為 0。
 
-## 沒有驗證的
+## #27 文件整理時尚未驗證的項目
 
 - 未呼叫真實模型，本次只驗證缺少金鑰時會保存失敗結果；替身模型測試不能代表真模型通過。
 - 未做瀏覽器互動、Docker Compose／Nginx 部署、真實故障卡注入或長時間自動 detector 復原流程。

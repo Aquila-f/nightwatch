@@ -40,7 +40,7 @@ The playground is a working local storefront with products, persistent carts, an
 
 The [2026-09-12 integration audit](docs/readme/integration-status.md) documents the current path: storefront requests → partial monitoring → Guard Room → investigation/report. Automatic detection requires three consecutive fresh `warning`/`failing` observations for a node; investigations can also be started manually.
 
-**Monitoring does not yet cover every split service, so a storefront fault is not guaranteed to trigger an investigation.** The Console has no repair approval flow. With `NIGHTWATCH_SHOP_URL` configured, the agent can deactivate faults in the designated local demo storefront; this does not establish business recovery. A report—or a mock recovered state—is not proof of recovery.
+**Checkout request, logic, and DB writes now appear in a six-node graph; catalog/cart internals remain partially covered.** An active fault needs checkout traffic to produce observations; automatic investigation still depends on consecutive fresh anomalies. The Console has no repair approval flow. With `NIGHTWATCH_SHOP_URL` configured, the agent can deactivate faults in the designated local demo storefront; this does not establish business recovery. A report—or a mock recovered state—is not proof of recovery.
 
 ## Architecture
 
@@ -71,7 +71,7 @@ The storefront uses shared JSONL by default. Other Python services can opt into 
 
 ## Quick start
 
-Run from the repository root. Have Git, Docker + Compose, GNU Make, Python, and `uv` available. Python version requirements are component-specific: Monitor needs 3.11+, and the storefront container uses 3.12. The Console uses the standard library and needs no npm install.
+Run from the repository root. Have Git, Docker + Compose, Python 3, curl, and lsof available. Dependencies are installed inside the containers: Python 3.12 for the storefront and 3.13 for Guard Room. The Console uses the standard library and needs no npm install.
 
 Initial dependency installation, image pulls, and Docker builds may need network access. With dependencies and images prepared, local services and explicitly selected recordings can run offline. **Live AI investigation requires a reachable model endpoint and credentials**; automatic detection can also initiate model calls.
 
@@ -79,38 +79,37 @@ Initial dependency installation, image pulls, and Docker builds may need network
 git clone https://github.com/davidleitw/nightwatch-hack.git
 cd nightwatch-hack
 
-# Build and start the five storefront containers.
-make -C shop-web up
+# Build and restart Shop, Guard Room, and Console.
+./restart.sh
 
-# Start Guard Room. It installs locked dependencies and validates config.
-bash guardroom/restart.sh
-
-# Build the Console, then serve the production assets in this terminal.
-python3 console/build.py
-python3 console/serve.py --port 4173 --control-url http://127.0.0.1:8001
+# Reuse Docker images, or stop all services while preserving data.
+# ./restart.sh --open
+# ./restart.sh --close
 ```
+
+The script preserves existing host ports; the table lists first-deployment defaults. Override them with `FRONTEND_PORT=8081 BACKEND_PORT=8001 PORT=9999 CONSOLE_PORT=4173 ./restart.sh`. Console runs in the background on the host, with PID/log files in `.run/`. Restarting interrupts connections and active investigations while preserving Docker volumes and monitor logs. See the [deployment guide](guardroom/README.md).
 
 | Entry | URL | Purpose |
 | --- | --- | --- |
 | Storefront | http://127.0.0.1:8080 | Products, carts, demo orders |
 | Fault playground | http://127.0.0.1:8080/#/events | Three order-service faults |
 | Console | http://127.0.0.1:4173 | Live investigation workspace |
-| Guard Room API | http://127.0.0.1:8001/docs | Interactive API documentation |
+| Guard Room API | http://127.0.0.1:9999/docs | Interactive API documentation |
 | Storefront API | http://127.0.0.1:8000/docs | Gateway API documentation |
 
 Check the services from another terminal:
 
 ```sh
 curl --fail-with-body http://127.0.0.1:8080/api/health
-curl --fail-with-body http://127.0.0.1:8001/health
-curl --fail-with-body http://127.0.0.1:8001/api/graph
+curl --fail-with-body http://127.0.0.1:9999/health
+curl --fail-with-body http://127.0.0.1:9999/api/graph
 ```
 
-Browse products to generate monitored requests; an empty observation window may show unknown. Checkout has no payment or fulfillment integration. Run Guard Room with **one worker** and update `NIGHTWATCH_GRAPH_URL` if its port changes.
+Browse products to generate monitored requests; no completed events in the 60-second window means unknown, not recovery. Checkout has no payment or fulfillment integration. Run Guard Room with **one worker** and keep the container graph URL on internal port 9999; host CLI clients must use the published port.
 
 ### Enable AI investigation
 
-**Before** starting Guard Room, set `NIGHTWATCH_LLM_API_KEY` or `OPENAI_API_KEY` in that shell; the former takes precedence. Configure `NIGHTWATCH_LLM_ENDPOINT` and `NIGHTWATCH_LLM_MODEL` for your deployment; defaults and CLI options are in the [Agent guide](control/README.md). The HTTP server reads process environment variables and does not load `.env` itself.
+**Before** starting Guard Room, set `NIGHTWATCH_LLM_API_KEY` or `OPENAI_API_KEY` in that shell; the former takes precedence. Configure `NIGHTWATCH_LLM_ENDPOINT` and `NIGHTWATCH_LLM_MODEL` for your deployment; defaults and CLI options are in the [Agent guide](control/README.md). Alternatively, put settings in the Git-ignored `guardroom/.env` for Compose to inject. The HTTP server itself does not load dotenv; the CLI’s `control/.env` is not automatically used by the container.
 
 Just exploring the UI? After building the Console, explicitly start its offline mock on another port. This mode cannot create live investigations.
 
@@ -143,18 +142,18 @@ Declare the **`monitor_id` → node mapping** in Guard Room first. Logs from unk
 Live investigation example; requires the model configuration above:
 
 ```sh
-curl --fail-with-body http://127.0.0.1:8001/api/investigations \
+curl --fail-with-body http://127.0.0.1:9999/api/investigations \
   -H 'Content-Type: application/json' \
   -d '{"request_id":"readme-manual-001","trigger":{"source":"manual","reason":"Inspect current service anomalies"}}'
 ```
 
-Repeat the same `request_id` and payload to retrieve the same investigation. Use a new ID for a new investigation; keep both unchanged for retries. Only one investigation runs at a time. Reports return `409` until finalized and `404` for unknown IDs. SSE supports resuming with `after` or `Last-Event-ID`. See the [HTTP API guide](control/server/README.md) for the full interface.
+Repeat the same `request_id` and payload to retrieve the same investigation. Use a new ID for a new investigation; keep both unchanged for retries. Only one investigation runs at a time. Reports return `409` until finalized and `404` for unknown IDs. Investigation SSE supports resuming with `after` or `Last-Event-ID`; monitor logs are not replayed. See the [HTTP API guide](control/server/README.md) for the full interface.
 
 ### 3. Connect to the storefront
 
 External clients use the gateway on `:8000` or the Nginx `/api/` proxy on `:8080`. Catalog, cart, and order stay inside the Compose network. See the [storefront API contract](shop-web/docs/API.md) for products, carts, checkout, and `Idempotency-Key` behavior.
 
-Fault cards use the storefront's **`GET/POST/DELETE /api/demo-faults`**. Setting `NIGHTWATCH_SHOP_URL` enables `get_demo_faults`, `deactivate_demo_fault`, and `check_shop_health` for the designated local demo. See the [demo repair boundaries](control/SYSTEM_DESIGN.md). Legacy control `/api/faults*` and approval operations still return `503` in live mode; the interfaces are not interchangeable.
+Fault cards use the storefront's **`GET/POST/DELETE /api/demo-faults`**. The repair tools support null leases for persistent faults. Docker Compose leaves repair disabled, and container localhost does not reach the host storefront. For a host CLI/server, setting `NIGHTWATCH_SHOP_URL` enables `get_demo_faults`, `deactivate_demo_fault`, and `check_shop_health` for the designated local demo. See the [demo repair boundaries](control/SYSTEM_DESIGN.md). Legacy control `/api/faults*` and approval operations still return `503` in live mode; the interfaces are not interchangeable.
 
 ## Roadmap
 
@@ -162,7 +161,7 @@ These proposed priorities follow the current integration gaps. They are future w
 
 | Priority | Next step | Outcome |
 | --- | --- | --- |
-| 1 | Align instrumentation and graph mappings | Relate faults to the services they affect |
+| 1 | Extend catalog/cart instrumentation and order health mapping | Relate faults to the services they affect |
 | 2 | Harden concurrent demo-fault operations and lifecycle | Strengthen the existing local deactivation tools |
 | 3 | Add approval, repair execution, and an observation window | Verify recovery with evidence |
 | 4 | Add baselines, metrics, traces, and independent probes | Give investigations more complete observations |
@@ -178,10 +177,10 @@ Want to contribute? Pick a gap from the [integration audit](docs/readme/integrat
 | [control/monitor/](control/monitor/README.md) | Function instrumentation and event delivery |
 | [control/](control/README.md) | Investigation tools, model settings, and CLI |
 | [control/server/](control/server/README.md) | APIs, persistence, and event streams |
-| [guardroom/](guardroom/README.md) | Local startup and monitor mappings |
+| [guardroom/](guardroom/README.md) | Docker deployment and monitor mappings |
 | [console/](console/README.md) | Live workspace and opt-in recordings |
 | [Integration status](docs/readme/integration-status.md) | Detailed live integration, mock, and limitation audit |
-| [INTEGRATION.md](INTEGRATION.md) | Original integration audit retained on master |
+| [INTEGRATION.md](INTEGRATION.md) | Current implementation and historical verification records |
 | `contracts/schemas/`, `contracts/fixtures/` | Runtime schemas and recordings; obsolete architecture documents removed |
 | `gate/` | PR and harness tools, separate from application runtime |
 
