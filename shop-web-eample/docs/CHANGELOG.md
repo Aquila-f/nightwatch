@@ -21,3 +21,9 @@
 - backend 重啟前後都確認有相同四筆測試訂單，且 proxy health check 維持 OK，表示訂單資料在重啟後仍可讀取。
 - 前端 production build 成功。
 - 未執行瀏覽器自動化互動測試。
+
+## 整合紀錄 — 2026-09-12
+
+- 使用者同意繼續 `shop-web/` 並忽略既有 `shop/`；原有 `shop/` 等遠端內容保留，文件使用 `shop-web-eample/docs/`。
+- main agent 從 `origin/master` 的 `e12599a` 建立 `feat/integrate-shop-web`，以 `--allow-unrelated-histories` 成功整合本機 `main`；雙方原本的獨立歷史均保留。
+- 本次整合尚未 push；後續 `main` fast-forward 結果不在本紀錄中預先宣稱。

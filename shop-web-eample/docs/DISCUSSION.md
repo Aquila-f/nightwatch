@@ -36,3 +36,9 @@
 - 初版由 main agent 在使用者補充協作要求前建立。
 - 使用者補充協作要求後，改由 subagent `gpt-5.6-luna max` 接手實作、檢查與修正。
 - main agent 統籌整合驗證，完成後依需求將 `feat/simple-shop` 成果添加到 `main`。
+
+## 2026-09-12｜本次整合紀錄
+
+- 使用者同意繼續 `shop-web/` 並忽略既有 `shop/`；原有 `shop/` 等遠端內容保留，文件使用 `shop-web-eample/docs/`。
+- main agent 從 `origin/master` 的 `e12599a` 建立 `feat/integrate-shop-web`，再以 `--allow-unrelated-histories` 成功整合本機 `main`；雙方原本的獨立歷史均保留。
+- 本次整合尚未 push；後續 `main` fast-forward 結果留待主 agent 回覆，不在此預先宣稱。
