@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "GET /api/graph/snapshots response body",
+  "type": "object",
+  "required": ["snapshots", "next_before_seq"],
+  "properties": {
+    "snapshots": {
+      "type": "array",
+      "maxItems": 500,
+      "items": {
+        "type": "object",
+        "required": ["seq", "at"],
+        "properties": {
+          "seq": { "type": "integer", "minimum": 1 },
+          "at": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]([01]\\d|2[0-3]):[0-5]\\d)$"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "next_before_seq": { "type": ["integer", "null"], "minimum": 1 }
+  },
+  "additionalProperties": false
+}
