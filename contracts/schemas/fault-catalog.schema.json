@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "NightWatch fault catalog response",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": [
+      "id",
+      "title_zh",
+      "symptom_zh",
+      "story_zh",
+      "difficulty",
+      "on_stage",
+      "lease_secs",
+      "expect",
+      "mechanism_family",
+      "curve_preview",
+      "curve_unit",
+      "curve_knob"
+    ],
+    "properties": {
+      "id": {
+        "enum": [
+          "payment_failure_ramp",
+          "recommendation_cache_growth",
+          "kafka_consumer_backlog",
+          "payment_failure_with_cart_decoy",
+          "email_memory_growth",
+          "catalog_pool_leak",
+          "payment_provider_degradation",
+          "fulfillment_backlog",
+          "audit_debug_logging",
+          "checkout_decoy_combo"
+        ]
+      },
+      "title_zh": { "type": "string" },
+      "symptom_zh": { "type": "string" },
+      "story_zh": { "type": "string" },
+      "difficulty": { "enum": ["easy", "medium", "hard"] },
+      "on_stage": { "enum": ["primary", "secondary", "backup", "off"] },
+      "lease_secs": { "type": "integer", "minimum": 901 },
+      "expect": {
+        "type": "object",
+        "required": ["detect_after_secs"],
+        "properties": {
+          "detect_after_secs": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": { "type": "number" }
+          }
+        },
+        "additionalProperties": false
+      },
+      "mechanism_family": { "type": "string" },
+      "curve_preview": {
+        "type": "array",
+        "minItems": 24,
+        "maxItems": 24,
+        "items": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": { "type": ["number", "string", "boolean"] }
+        }
+      },
+      "curve_unit": { "type": "string" },
+      "curve_knob": { "type": "string" }
+    },
+    "additionalProperties": false
+  },
+  "additionalProperties": false
+}

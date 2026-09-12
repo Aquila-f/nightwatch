@@ -1,0 +1,8 @@
+{
+  "schema_version": "nightwatch.manifest.v2",
+  "nodes": [],
+  "edges": [],
+  "checks": [],
+  "mechanism_families": {},
+  "actions": []
+}

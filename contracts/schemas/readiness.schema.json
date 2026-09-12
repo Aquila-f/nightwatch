@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "NightWatch readiness response",
+  "type": "object",
+  "required": ["ready", "checks", "next_step_zh"],
+  "properties": {
+    "ready": { "type": "boolean" },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "status", "detail_zh"],
+        "properties": {
+          "id": { "type": "string" },
+          "status": { "enum": ["ok", "waiting", "failed"] },
+          "detail_zh": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "next_step_zh": { "type": "string" }
+  },
+  "additionalProperties": false
+}

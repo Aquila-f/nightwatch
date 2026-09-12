@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "NightWatch incident SSE commit",
+  "type": "object",
+  "required": ["schema_version", "incident_id", "run_id", "base_revision", "revision", "event"],
+  "properties": {
+    "schema_version": { "const": "nightwatch.incident-commit.v2" },
+    "incident_id": { "type": "string" },
+    "run_id": { "type": "string" },
+    "base_revision": { "type": "integer" },
+    "revision": { "type": "integer" },
+    "event": {
+      "type": "object",
+      "required": ["id", "seq", "type", "occurred_at", "actor", "timeline"],
+      "properties": {
+        "id": { "type": "string" },
+        "seq": { "type": "integer" },
+        "type": {
+          "enum": [
+            "run.started",
+            "baseline.captured",
+            "incident.detected",
+            "detection.corroborated",
+            "snapshot.pinned",
+            "investigation.started",
+            "investigation.restarted",
+            "repair.retry_started",
+            "repair_plan.invalid",
+            "tool.started",
+            "observation.recorded",
+            "model.turn_failed",
+            "model.response.started",
+            "model.text.delta",
+            "model.response.completed",
+            "model.response.failed",
+            "hypothesis.concluded",
+            "action.proposed",
+            "approval.recorded",
+            "action.started",
+            "action.completed",
+            "verification.window_completed",
+            "verification.completed",
+            "incident.completed",
+            "fault.instance.changed",
+            "config.revision_changed",
+            "graph.gap",
+            "operator.aborted",
+            "fault.activated",
+            "fault.restored",
+            "fault.lease_expired"
+          ]
+        },
+        "occurred_at": { "type": "string" },
+        "t": { "type": "integer" },
+        "actor": {
+          "type": "object",
+          "required": ["kind", "id"],
+          "properties": {
+            "kind": { "enum": ["go", "model", "tool", "operator", "grafana"] },
+            "id": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "timeline": {
+          "type": "object",
+          "required": ["title", "summary_zh"],
+          "properties": {
+            "title": { "type": "string" },
+            "summary_zh": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "refs": {
+          "type": "object",
+          "properties": {
+            "node_ids": { "type": "array", "items": { "type": "string" } },
+            "evidence_ids": { "type": "array", "items": { "type": "string" } }
+          },
+          "additionalProperties": true
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "changed_nodes": {
+      "type": "array",
+      "items": { "type": "object", "additionalProperties": true }
+    },
+    "new_evidence": {
+      "type": "array",
+      "items": { "type": "object", "additionalProperties": true }
+    },
+    "proposal": { "type": "object", "additionalProperties": true },
+    "approval": { "type": "object", "additionalProperties": true },
+    "execution": { "type": "object", "additionalProperties": true },
+    "verification": { "type": "object", "additionalProperties": true },
+    "audit": { "type": "object", "additionalProperties": true },
+    "hypothesis": { "type": "object", "additionalProperties": true },
+    "fault_instances": {
+      "type": "array",
+      "items": { "type": "object", "additionalProperties": true }
+    },
+    "incident": { "type": "object", "additionalProperties": true }
+  },
+  "additionalProperties": true
+}

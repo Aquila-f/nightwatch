@@ -1,0 +1,299 @@
+{
+  "incident_id": "inc-1789003745",
+  "run_id": "run-1789003745",
+  "card_id": "catalog_pool_leak",
+  "outcome": "recovered",
+  "counted_recovery_success": true,
+  "detected_at": "2026-09-10T01:33:01.374669Z",
+  "closed_at": "2026-09-10T01:36:01.891835Z",
+  "durations": {
+    "inject_to_detect_secs": 111,
+    "detect_to_close_secs": 181,
+    "approve_to_verified_secs": 45
+  },
+  "root_cause": {
+    "node": "catalog",
+    "mechanism": "Catalog connection pool exhaustion causing GetProduct waits and timeouts",
+    "summary_zh": "catalog 的連線池自 t=-115 起持續飽和，最終導致 GetProduct 延遲與錯誤；Postgres 呼叫仍快速且無錯誤。"
+  },
+  "confidence": 0.96,
+  "audit": {
+    "status": "passed",
+    "timeline_status": "accepted",
+    "checks": [
+      {
+        "id": "evidence_integrity",
+        "status": "passed",
+        "reason": "all cited evidence IDs belong to this incident"
+      },
+      {
+        "id": "direct_origin",
+        "status": "passed",
+        "reason": "root service matches the deterministic origin/call-graph tie-break"
+      },
+      {
+        "id": "cause_action",
+        "status": "passed",
+        "reason": "Go cause-to-action table resolved the action"
+      },
+      {
+        "id": "timeline_onset",
+        "status": "passed",
+        "reason": ""
+      },
+      {
+        "id": "timeline_order",
+        "status": "passed",
+        "reason": ""
+      }
+    ]
+  },
+  "ai_timeline": {
+    "onset": {
+      "node": "catalog",
+      "t": -115,
+      "signal": "sat",
+      "evidence_id": "ev-0010-call_QElZdj3R02MDSJ10JatlFWjq"
+    },
+    "propagation": [
+      {
+        "node": "catalog",
+        "t": -15,
+        "signal": "err"
+      },
+      {
+        "node": "checkout",
+        "t": 0,
+        "signal": "err"
+      },
+      {
+        "node": "storefront",
+        "t": 0,
+        "signal": "err"
+      }
+    ]
+  },
+  "measured": {
+    "deviations": [
+      {
+        "node": "catalog",
+        "axis": "latency",
+        "t": -95
+      },
+      {
+        "node": "catalog",
+        "axis": "saturation",
+        "t": -90
+      },
+      {
+        "node": "catalog",
+        "axis": "errors",
+        "t": -11
+      },
+      {
+        "node": "checkout",
+        "axis": "errors",
+        "t": -11
+      },
+      {
+        "node": "checkout",
+        "axis": "latency",
+        "t": -11
+      },
+      {
+        "node": "shopper",
+        "axis": "errors",
+        "t": -11
+      },
+      {
+        "node": "shopper",
+        "axis": "latency",
+        "t": -11
+      },
+      {
+        "node": "storefront",
+        "axis": "errors",
+        "t": -11
+      },
+      {
+        "node": "storefront",
+        "axis": "latency",
+        "t": -11
+      }
+    ]
+  },
+  "truth": {
+    "card_id": "catalog_pool_leak",
+    "t_injected": -111,
+    "curve": [
+      [
+        -111,
+        6
+      ],
+      [
+        -59,
+        6
+      ],
+      [
+        -7,
+        6
+      ],
+      [
+        46,
+        6
+      ],
+      [
+        98,
+        6
+      ],
+      [
+        150,
+        6
+      ],
+      [
+        202,
+        6
+      ],
+      [
+        254,
+        6
+      ],
+      [
+        306,
+        6
+      ],
+      [
+        359,
+        6
+      ],
+      [
+        411,
+        6
+      ],
+      [
+        463,
+        6
+      ],
+      [
+        515,
+        6
+      ],
+      [
+        567,
+        6
+      ],
+      [
+        619,
+        6
+      ],
+      [
+        672,
+        6
+      ],
+      [
+        724,
+        6
+      ],
+      [
+        776,
+        6
+      ],
+      [
+        828,
+        6
+      ],
+      [
+        880,
+        6
+      ],
+      [
+        932,
+        6
+      ],
+      [
+        985,
+        6
+      ],
+      [
+        1037,
+        6
+      ],
+      [
+        1089,
+        6
+      ]
+    ],
+    "root": "catalog",
+    "mechanism_family": "db_pool_leak",
+    "expected_action": "rollback_config:catalog",
+    "expected_order": [
+      "catalog",
+      "checkout",
+      "storefront"
+    ]
+  },
+  "comparison": {
+    "ai_onset_minus_truth_secs": -4,
+    "ai_onset_minus_measured_secs": -20,
+    "detect_minus_truth_secs": 111,
+    "detect_minus_ai_onset_secs": 115
+  },
+  "early_sign": {
+    "seq": 29,
+    "t": -95,
+    "node": "catalog",
+    "axis": "latency",
+    "value": 220.00000000000006,
+    "errors_then": 0
+  },
+  "action": {
+    "id": "rollback_config",
+    "target": "catalog",
+    "executed_at": "2026-09-10T01:35:16.815892Z",
+    "steps": [
+      {
+        "kind": "put_config",
+        "revision": "v1",
+        "status": "ok",
+        "observed": {
+          "knobs": {
+            "db.leak_per_minute": 0
+          },
+          "revision": "v1"
+        }
+      }
+    ]
+  },
+  "verification": {
+    "windows": [
+      {
+        "index": 1,
+        "passed": true,
+        "observed": {
+          "catalog.pool_in_use": 2,
+          "failing_nodes": [],
+          "shopper_fail_ratio": 0,
+          "shopper_p95_ms": 140
+        }
+      },
+      {
+        "index": 2,
+        "passed": true,
+        "observed": {
+          "catalog.pool_in_use": 2,
+          "failing_nodes": [],
+          "shopper_fail_ratio": 0,
+          "shopper_p95_ms": 140
+        }
+      }
+    ],
+    "safety_recovery": false
+  },
+  "residual": [],
+  "pinned_window": {
+    "from_t": -235,
+    "to_t": 180,
+    "step_secs": 5,
+    "count": 84
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "NightWatch graph edge",
+  "type": "object",
+  "required": ["from", "to", "kind", "rps", "errors", "p95_ms", "observed"],
+  "properties": {
+    "from": { "type": "string" },
+    "to": { "type": "string" },
+    "kind": { "enum": ["calls", "uses", "publishes", "consumes"] },
+    "rps": { "type": ["number", "null"] },
+    "errors": { "type": ["number", "null"] },
+    "p95_ms": { "type": ["number", "null"] },
+    "observed": { "type": "boolean" }
+  },
+  "additionalProperties": false
+}
