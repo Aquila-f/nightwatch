@@ -37,7 +37,10 @@ Investigation manager 預設將 session 存在 `../.data/investigations.sqlite3`
 可用 `NIGHTWATCH_INVESTIGATION_DB` 指定其他檔案，並以 `NIGHTWATCH_GRAPH_URL`
 指定操作端設定的 graph 來源。
 
-實際調查使用 `NIGHTWATCH_LLM_API_KEY`（或 `OPENAI_API_KEY`）與 `NIGHTWATCH_LLM_MODEL`。
+實際調查使用 `NIGHTWATCH_LLM_API_KEY`（或 `OPENAI_API_KEY`）與 `NIGHTWATCH_LLM_MODEL`（預設 `gpt-6-astra`）。
+Live graph adapter 提供 `get_graph`（含歷史 timestamp）、`list_graph_snapshots`
+與 `get_node_detail`，詳見 [agent tools](../README.md)。更新 agent package 後需重啟後端，
+讓新調查載入新的 tools 與 prompt。
 離線檢查可透過 `install_investigations(..., model_factory=...)` 注入 Python model factory，
 或在 app 啟動前替換 `app.state.investigation_manager.model_factory`。
 HTTP client 不可選擇模型或 graph URL。完整介面見 [調查前端文件](../INVESTIGATION-FRONTEND.md)。
