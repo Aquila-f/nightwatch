@@ -1,79 +1,71 @@
 # NightWatch Investigator
 
-`nightwatch_agent/` 使用 Guard Room API 執行調查。Guard Room backend 位於
-[`guardroom/backend/`](../guardroom/backend/)，Monitor SDK 位於 [`monitor/`](../monitor/)。
+獨立的 graph 觀測與異常偵測服務。每 5 秒透過 HTTP 讀 Guard Room，按節點確認連續三次異常／恢復，保存偵測依據與可續傳事件。
 
-## CLI
+目前沒有 AI loop、模型呼叫、thinking、report 或修復能力。手動建立調查回 `503 runner_unavailable`，不建立等待中的假調查。舊版模型程式已移除，舊 SQLite 資料不遷移、不刪除。
 
-依賴安裝好後，在 repo 根目錄執行：
+## 啟動
+
+整套服務：
 
 ```sh
-bash investigator/run-agent.sh --describe-context
-bash investigator/run-agent.sh --model
-bash investigator/run-agent.sh --graph-url http://127.0.0.1:9999/api/graph --model
+./restart.sh
 ```
 
-`--describe-context` 只讀 graph 並列出 prompt／工具，不呼叫模型。`--model` 使用真實模型，需要模型服務可達與金鑰。腳本以 `uv run --locked --offline` 執行，依序選 `investigator/.env` 或根目錄 `.env`，不安裝新依賴。
+只建置及啟動 Guard Room、Investigator：
 
-| 變數 | 行為 |
+```sh
+./guardroom/deploy/restart.sh
+```
+
+本機開發使用兩個終端，先依 [Guard Room guide](../guardroom/backend/README.md) 啟動資料來源，再執行：
+
+```sh
+uv sync --project investigator --locked
+NIGHTWATCH_GRAPH_URL=http://127.0.0.1:9999/api/graph \
+  investigator/.venv/bin/python -m uvicorn nightwatch_investigator.api:app \
+  --host 127.0.0.1 --port 9998 --workers 1
+```
+
+| 環境變數 | 預設／用途 |
 | --- | --- |
-| `NIGHTWATCH_GRAPH_URL` | 預設 `http://127.0.0.1:9999/api/graph`；CLI `--graph-url` 優先 |
-| `NIGHTWATCH_LLM_API_KEY`、`OPENAI_API_KEY` | 前者優先 |
-| `NIGHTWATCH_LLM_ENDPOINT` | 預設 `https://api.openai.com/v1/responses` |
-| `NIGHTWATCH_LLM_MODEL` | 預設 `gpt-6-astra`；CLI `--model MODEL` 優先 |
+| `NIGHTWATCH_GRAPH_URL` | `http://127.0.0.1:9999/api/graph`；只接受即時 HTTP(S) graph，不接受 query |
+| `INVESTIGATOR_SOURCE_ID` | `guardroom`；DB 的來源身份，換成不同來源必須換 DB |
+| `INVESTIGATOR_DB` | `investigator/.data/investigator.sqlite3` |
+| `INVESTIGATOR_POLL_SECONDS` | `5`；可設為大於 0、至多 5 秒 |
 
-模型或資料來源失敗會回報錯誤，不會自動換成錄影。
+Compose 使用內網 `http://guardroom:9999/api/graph`，Investigator 不發布 host port。自己的 named volume 保存 SQLite，Guard Room 不掛載它。兩個服務可獨立啟動；readiness 不等待對方。
 
-## 實際工具與限制
+## API 與語意
 
-修復與 cache 設計見 [SYSTEM_DESIGN.md](SYSTEM_DESIGN.md)。設定 `NIGHTWATCH_SHOP_URL` 為獨占操作的本機店面 HTTP origin，才提供 `get_demo_faults`、`deactivate_demo_fault`、`check_shop_health`；解除演練故障不等於業務恢復。
+瀏覽器只連 Guard Room。此服務 API 供 Guard Room 使用：
 
-真實來源提供 `get_graph`、`list_graph_snapshots`、`get_node_detail`、`search_logs`，以 `submit_report` 交付結構化報告。報告記錄 findings、hypotheses、limitations、next_steps，驗證節點與 evidence ID；有調查報告不代表修復成功。
-
-歷史工具讀原始快照，沒有可信基線。`search_logs` 只在最新一批保留日誌內搜尋，沒有全歷史分頁。Prometheus、trace 與通用 runtime 修復未接入；可明確啟用本機店面 demo-fault 解除及 health 查詢。
-
-`alive` 是 monitor 窗口內有無事件；edge 來自設定，尚無邊流量量測；缺失值是 `null`。不要把沒有事件解讀成服務已死，或把 `null` 當零。
-
-## 明確選用的離線資料
-
-```sh
-bash investigator/run-agent.sh --replay-model
-bash investigator/run-agent.sh --fixture contracts/fixtures/catalog_pool_leak --model
-```
-
-`--replay-model` 使用腳本模型與錄影工具，完全離線；目前錄影缺少足夠 trace 證據，回 `unresolved`、exit 1。`--fixture --model` 使用真模型配錄影工具，不能算 live 資料驗證。
-
-## HTTP 與驗證
-
-啟動與端點見 [Guard Room backend README](../guardroom/backend/README.md)。HTTP server 使用程序環境中的模型設定；與 CLI 不同，它不自行載入 `.env`。
-
-既有離線測試：
-
-```sh
-PYTHONPATH=investigator investigator/.venv/bin/python -m unittest discover -s tests/investigator -v
-```
-
-這些測試包含模型替身，通過不等於真實模型端到端驗證。Monitor 使用方式見 [Monitor README](../monitor/README.md)。
-
-## 排查案例記憶
-
-HTTP 後端會在每次調查結案時，從既有報告與工具事件產生簡單案例，與結案報告在同一 SQLite transaction 保存；不增加模型呼叫或外部儲存。服務升級時也會補建既有結案案例。失敗、中斷與證據不足的排查同樣保存，保留原始狀態與限制，不當成已解決問題。
-
-每次手動或自動觸發 agent，harness 在第一則 user message 的第一個欄位 `recent_investigations` 注入最近五次結案摘要（不足五次就全部，最新在前）。摘要最多 16 KiB，只帶案例 ID、時間、狀態、結論、症狀與候選根因；文字裁切明確標為 `preview_only`。模型認為可能重複時，以 `get_investigation_memory({"id":"inv-…"})` 讀取詳細案例；已知的更舊 ID 也可查。不存在或尚未結案的 ID 會回明確錯誤。查詢沿用既有工具預算，回覆上限 32 KiB，超量會標明 `truncated`。
-
-案例格式 `nightwatch.investigation-memory.v1` 存在同一資料庫的 `investigation_memories` 表，ID 與原調查相同：
-
-| 欄位 | 內容 |
+| Endpoint | 行為 |
 | --- | --- |
-| `schema_version`, `id`, `closed_at` | 版本、原調查 ID、結案時間 |
-| `status`, `outcome`, `conclusion` | 執行狀態、結案結果與原報告結論；無有效報告時 conclusion 為 null |
-| `trigger`, `data_scope` | 原觸發原因與觀測範圍；沒有範圍資訊時為 null |
-| `summary_zh`, `symptoms` | 原摘要與 findings，保留 node_ids、evidence_ids |
-| `investigation_steps` | 依順序保存工具、參數、觀測摘要、舊 evidence_id；失敗保留錯誤，未回傳標為 no_result |
-| `root_cause.status` | 有 hypotheses 時為 candidate，沒有則 unknown；不自行升級為確認根因 |
-| `root_cause.candidates` | 原 hypotheses：cause_zh、node_ids、supporting_evidence_ids、counterevidence_ids、uncertainty_zh |
-| `limitations`, `next_steps` | 原限制與後續查證建議 |
+| `GET /health/ready` | DB 可讀、HTTP 可用；不表示 graph 來源正常 |
+| `GET /v1/state` | 一致的 state、cursor、stream_id、來源狀態、最近 20 筆偵測 |
+| `GET /v1/detections?limit=100&before=...` | 依建立 cursor 由新到舊分頁 |
+| `GET /v1/detections/{id}` | 完整觸發／恢復快照與連續確認依據 |
+| `GET /v1/events?after=0&stream_id=...` | 依 cursor 遞增；next_after 與 has_more 續傳 |
+| `GET /v1/investigations` | 空清單，runner_available=false |
+| `POST /v1/investigations` | 503，尚未接入 Runner |
 
-模型仍先取得當前 graph，再對照舊候選根因的成立條件、反證、節點、錯誤與時間；須指出當下符合、不符及未知之處。舊案例是查證線索，不能證明事故重演，也不授權重做修復。報告驗證器會拒絕用案例查詢的 evidence ID 支持本次 findings 或 hypotheses；模型必須另外取得當次觀測證據。舊工具步驟不再複製歷史查詢結果，避免案例遞迴膨脹。
+同一節點持續異常只建立一筆 detection；其他節點獨立確認。連續三次新鮮的 `ok` 才標為 `recovered`，之後可重新觸發。不存在、unknown、來源離線與過期資料都不算恢復。恢復是節點監測狀態正常，並非根因結論、人工修復或業務驗證。
 
-完整原始工具結果仍在原調查的 evidence/export；案例本身保存簡化查詢過程，不複製原始日誌或整段對話。資料隨既有 investigation DB 持久化，目前沒有另外的清除政策。本功能接在持久化 HTTP 後端；獨立 CLI 沿用原本單次調查模式。
+Snapshot 必須在現在前 15 秒至後 5 秒之間，logstore 必須可用且 age_secs ≤ 60。重複快照不計數；倒序、超過 15 秒的觀測間隔、graph gap、來源錯誤會打斷連續確認。來源 sequence 重設但時間前進時重新累計；程序重啟也重新累計，已保存的 active detection 與 cursor 保留。
+
+僅 polling 最新快照，**不補讀歷史缺口**；短於 polling 間隔的變化可能漏過。Graph 快照窗口重疊，三次確認不是三組獨立請求樣本。
+
+## 開發與驗證
+
+```sh
+PYTHONPATH=investigator:guardroom/backend \
+  investigator/.venv/bin/python -m unittest discover -s tests/investigator -v
+node --test guardroom/frontend/tests/*.test.mjs
+PYTHONPATH=investigator:guardroom/backend \
+  investigator/.venv/bin/python tests/acceptance/detection_flow.py
+```
+
+驗收使用隔離的臨時資料、真實本機 HTTP 服務與合成 monitor 事件，不連模型、不修改使用者的 Shop 或執行中服務。
+
+架構與下一階段的 Runner 接入方式見 [SYSTEM_DESIGN.md](SYSTEM_DESIGN.md)；正式服務契約見 [contracts/INVESTIGATOR.md](../contracts/INVESTIGATOR.md)。

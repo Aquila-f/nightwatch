@@ -39,3 +39,4 @@ build/
 .DS_Store
 guardroom/.run/
 /.run/
+investigator/.data/

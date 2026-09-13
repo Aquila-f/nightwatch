@@ -1,0 +1,514 @@
+{
+  "$defs": {
+    "Confirmation": {
+      "additionalProperties": false,
+      "properties": {
+        "seq": {
+          "title": "Seq",
+          "type": "integer"
+        },
+        "at": {
+          "title": "At",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "ok",
+            "warning",
+            "failing"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "errors": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Errors"
+        },
+        "p95_ms": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "P95 Ms"
+        }
+      },
+      "required": [
+        "seq",
+        "at",
+        "status",
+        "errors",
+        "p95_ms"
+      ],
+      "title": "Confirmation",
+      "type": "object"
+    },
+    "Detection": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "nightwatch.detection.v1",
+          "default": "nightwatch.detection.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "source_id": {
+          "title": "Source Id",
+          "type": "string"
+        },
+        "node_id": {
+          "title": "Node Id",
+          "type": "string"
+        },
+        "rule": {
+          "const": "persistent_node_status.v1",
+          "default": "persistent_node_status.v1",
+          "title": "Rule",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "active",
+            "recovered"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "detected_at": {
+          "title": "Detected At",
+          "type": "string"
+        },
+        "recovered_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Recovered At"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "event_seq": {
+          "minimum": 1,
+          "title": "Event Seq",
+          "type": "integer"
+        },
+        "created_cursor": {
+          "minimum": 1,
+          "title": "Created Cursor",
+          "type": "integer"
+        },
+        "investigation_id": {
+          "default": null,
+          "title": "Investigation Id",
+          "type": "null"
+        }
+      },
+      "required": [
+        "id",
+        "source_id",
+        "node_id",
+        "status",
+        "detected_at",
+        "summary",
+        "event_seq",
+        "created_cursor"
+      ],
+      "title": "Detection",
+      "type": "object"
+    },
+    "DetectionDetail": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "nightwatch.detection.v1",
+          "default": "nightwatch.detection.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "source_id": {
+          "title": "Source Id",
+          "type": "string"
+        },
+        "node_id": {
+          "title": "Node Id",
+          "type": "string"
+        },
+        "rule": {
+          "const": "persistent_node_status.v1",
+          "default": "persistent_node_status.v1",
+          "title": "Rule",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "active",
+            "recovered"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "detected_at": {
+          "title": "Detected At",
+          "type": "string"
+        },
+        "recovered_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Recovered At"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "event_seq": {
+          "minimum": 1,
+          "title": "Event Seq",
+          "type": "integer"
+        },
+        "created_cursor": {
+          "minimum": 1,
+          "title": "Created Cursor",
+          "type": "integer"
+        },
+        "investigation_id": {
+          "default": null,
+          "title": "Investigation Id",
+          "type": "null"
+        },
+        "confirmations": {
+          "items": {
+            "$ref": "#/$defs/Confirmation"
+          },
+          "title": "Confirmations",
+          "type": "array"
+        },
+        "snapshot": {
+          "additionalProperties": true,
+          "title": "Snapshot",
+          "type": "object"
+        },
+        "recovery_confirmations": {
+          "items": {
+            "$ref": "#/$defs/Confirmation"
+          },
+          "title": "Recovery Confirmations",
+          "type": "array"
+        },
+        "recovery_snapshot": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Recovery Snapshot"
+        }
+      },
+      "required": [
+        "id",
+        "source_id",
+        "node_id",
+        "status",
+        "detected_at",
+        "summary",
+        "event_seq",
+        "created_cursor",
+        "confirmations",
+        "snapshot"
+      ],
+      "title": "DetectionDetail",
+      "type": "object"
+    },
+    "DetectionPage": {
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/Detection"
+          },
+          "title": "Items",
+          "type": "array"
+        },
+        "next_before": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Next Before"
+        }
+      },
+      "required": [
+        "items",
+        "next_before"
+      ],
+      "title": "DetectionPage",
+      "type": "object"
+    },
+    "Event": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "nightwatch.investigator-event.v1",
+          "default": "nightwatch.investigator-event.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "event_id": {
+          "title": "Event Id",
+          "type": "string"
+        },
+        "cursor": {
+          "minimum": 1,
+          "title": "Cursor",
+          "type": "integer"
+        },
+        "detection_id": {
+          "title": "Detection Id",
+          "type": "string"
+        },
+        "investigation_id": {
+          "default": null,
+          "title": "Investigation Id",
+          "type": "null"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "occurred_at": {
+          "title": "Occurred At",
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "detection.created",
+            "detection.recovered"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/Detection"
+        }
+      },
+      "required": [
+        "event_id",
+        "cursor",
+        "detection_id",
+        "seq",
+        "occurred_at",
+        "type",
+        "payload"
+      ],
+      "title": "Event",
+      "type": "object"
+    },
+    "EventPage": {
+      "additionalProperties": false,
+      "properties": {
+        "stream_id": {
+          "title": "Stream Id",
+          "type": "string"
+        },
+        "items": {
+          "items": {
+            "$ref": "#/$defs/Event"
+          },
+          "title": "Items",
+          "type": "array"
+        },
+        "next_after": {
+          "minimum": 0,
+          "title": "Next After",
+          "type": "integer"
+        },
+        "has_more": {
+          "title": "Has More",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "stream_id",
+        "items",
+        "next_after",
+        "has_more"
+      ],
+      "title": "EventPage",
+      "type": "object"
+    },
+    "ObservationStatus": {
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "default": "waiting",
+          "enum": [
+            "waiting",
+            "ok",
+            "unavailable",
+            "stale",
+            "out_of_order"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "checked_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Checked At"
+        },
+        "last_success_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Success At"
+        },
+        "snapshot_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Snapshot At"
+        },
+        "snapshot_seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Snapshot Seq"
+        },
+        "message": {
+          "default": "等待第一次觀測",
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "title": "ObservationStatus",
+      "type": "object"
+    },
+    "State": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "nightwatch.investigator-state.v1",
+          "default": "nightwatch.investigator-state.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "stream_id": {
+          "title": "Stream Id",
+          "type": "string"
+        },
+        "cursor": {
+          "minimum": 0,
+          "title": "Cursor",
+          "type": "integer"
+        },
+        "server_now": {
+          "title": "Server Now",
+          "type": "string"
+        },
+        "runner_available": {
+          "const": false,
+          "default": false,
+          "title": "Runner Available",
+          "type": "boolean"
+        },
+        "source": {
+          "$ref": "#/$defs/ObservationStatus"
+        },
+        "active_count": {
+          "minimum": 0,
+          "title": "Active Count",
+          "type": "integer"
+        },
+        "recent_detections": {
+          "items": {
+            "$ref": "#/$defs/Detection"
+          },
+          "title": "Recent Detections",
+          "type": "array"
+        }
+      },
+      "required": [
+        "stream_id",
+        "cursor",
+        "server_now",
+        "source",
+        "active_count",
+        "recent_detections"
+      ],
+      "title": "State",
+      "type": "object"
+    }
+  }
+}

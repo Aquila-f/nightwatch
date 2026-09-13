@@ -33,13 +33,13 @@ report_failure() {
   local exit_code=$?
   trap - ERR
   compose ps -a >&2 || true
-  compose logs --tail=50 guardroom >&2 || true
+  compose logs --tail=50 guardroom investigator >&2 || true
   exit "$exit_code"
 }
 trap report_failure ERR
 
 if [[ "$action" == "--close" ]]; then
-  compose stop guardroom
+  compose stop guardroom investigator
   exit 0
 fi
 
@@ -47,14 +47,14 @@ fi
 # A custom MONITOR_LOG_DIR must already exist.
 mkdir -p "$repo_dir/.run/monitor"
 if [[ "$action" == "--restart" ]]; then
-  compose build guardroom
+  compose build guardroom investigator
 fi
 # Validate the mounted topology before replacing a working container.
 compose run --rm --no-deps --pull never --entrypoint python guardroom -c 'import os, sys; from pathlib import Path; sys.path.insert(0, "/app/guardroom/backend"); from graph_state import GraphConfig; GraphConfig.model_validate_json(Path(os.environ["GUARDROOM_CONFIG"]).read_text())'
 if [[ "$action" == "--restart" ]]; then
-  compose up -d --no-build --force-recreate --wait --wait-timeout 120 guardroom
+  compose up -d --no-build --force-recreate --wait --wait-timeout 120 guardroom investigator
 else
-  compose up -d --no-build --wait --wait-timeout 120 guardroom
+  compose up -d --no-build --wait --wait-timeout 120 guardroom investigator
 fi
 binding="$(compose port guardroom 9999)"
 curl --fail --silent --show-error --connect-timeout 2 --max-time 5 "http://$binding/health/ready"

@@ -97,15 +97,6 @@ def install_frontend(app, log_hub=None):
         if cursor is not None and not re.fullmatch(r"[^:]+:[0-9]+", cursor):
             raise APIError(400, "invalid_request", "cursor 必須是 <run_id>:<revision>")
         state = store.state()
-        high = store.investigations.cursor()
-        after = high
-        if cursor:
-            cursor_run, value = cursor.rsplit(":", 1)
-            if cursor_run == state["run"]["id"]:
-                if int(value) > high:
-                    raise APIError(400, "invalid_request", "cursor 超過目前事件版本")
-                after = int(value)
-
         def live_frame(name, data):
             event_id = f"id: {data['run_id']}:{data['revision']}\n" if name == "incident" else ""
             return f"{event_id}event: {name}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
@@ -115,7 +106,6 @@ def install_frontend(app, log_hub=None):
             try:
                 yield live_frame("state", state)
                 yield live_frame("graph", state["graph_now"])
-                last_cursor, last_high = after, high
                 graph_seq = state["graph_now"]["seq"]
                 ping_at = time.monotonic() + 2
                 while not await request.is_disconnected():
@@ -125,13 +115,6 @@ def install_frontend(app, log_hub=None):
                             if payload is None:
                                 return
                             yield live_frame("log", payload)
-                    current_high = store.investigations.cursor()
-                    if current_high != last_high:
-                        yield live_frame("state", store.state())
-                        last_high = current_high
-                    for commit in store.commits_after(last_cursor):
-                        yield live_frame("incident", commit)
-                        last_cursor = commit["revision"]
                     graph = store.graph_store.snapshot
                     if graph["seq"] != graph_seq:
                         yield live_frame("graph", graph)
@@ -165,7 +148,7 @@ def install_frontend(app, log_hub=None):
     def openapi():
         if app.openapi_schema is None:
             document = get_openapi(title=app.title, version=app.version, routes=app.routes,
-                                  description="Monitor graph 與 SQLite 調查提供真實唯讀前端 API。")
+                                  description="Monitor graph 與 Investigator HTTP 契約提供前端資料。")
             definitions = document.setdefault("components", {}).setdefault("schemas", {})
             for name in ("state", "readiness", "snapshot", "node", "edge", "faults", "incident-commit"):
                 definitions[name] = convert(json.loads((SCHEMAS / f"{name}.schema.json").read_text()))

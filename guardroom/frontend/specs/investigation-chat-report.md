@@ -1,3 +1,7 @@
+# 歷史規格
+
+此文件描述已移除的舊 AI 調查介面，僅供歷史參考。新版採用獨立 Investigator 偵測服務，Runner 尚未接入；目前契約見 [INVESTIGATOR.md](../../../contracts/INVESTIGATOR.md)。
+
 # 調查對話、獨立報告與歷史
 
 ## 目的與範圍

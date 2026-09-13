@@ -110,8 +110,8 @@ if [[ "$ready" != true ]]; then
 fi
 printf 'Console ready (PID %s): http://127.0.0.1:%s/?source=live#topology\nUpstream: %s\nLog: %s\n' "$server_pid" "$port" "$upstream" "$log_file"
 curl --noproxy '*' --fail --silent --show-error --max-time 5 "http://127.0.0.1:$port/" >/dev/null
-if ! curl --noproxy '*' --fail --silent --show-error --max-time 8 "http://127.0.0.1:$port/api/investigations/state" >/dev/null; then
+if ! curl --noproxy '*' --fail --silent --show-error --max-time 8 "http://127.0.0.1:$port/api/investigator/state" >/dev/null; then
   printf 'Console is running, but the upstream API check failed. Inspect %s.\n' "$log_file" >&2
   exit 1
 fi
-printf 'Homepage and investigation API: OK\n'
+printf 'Homepage and observation API: OK\n'

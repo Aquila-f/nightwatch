@@ -9,12 +9,7 @@ services:
       - "127.0.0.1:${PORT:-9999}:9999"
     environment:
       GUARDROOM_CONFIG: /app/guardroom/configs/shop.json
-      NIGHTWATCH_INVESTIGATION_DB: /app/guardroom/.run/investigations.sqlite3
-      NIGHTWATCH_GRAPH_URL: ${NIGHTWATCH_GRAPH_URL:-http://127.0.0.1:9999/api/graph}
-      NIGHTWATCH_LLM_API_KEY: ${NIGHTWATCH_LLM_API_KEY:-}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      NIGHTWATCH_LLM_MODEL: ${NIGHTWATCH_LLM_MODEL:-gpt-6-astra}
-      NIGHTWATCH_LLM_ENDPOINT: ${NIGHTWATCH_LLM_ENDPOINT:-https://api.openai.com/v1/responses}
+      INVESTIGATOR_URL: http://investigator:9998
     volumes:
       - type: bind
         source: ${GUARDROOM_CONFIG:-../configs/shop.json}
@@ -47,5 +42,36 @@ services:
       retries: 3
       start_period: 20s
 
+  investigator:
+    build:
+      context: ../..
+      dockerfile: investigator/Dockerfile
+    init: true
+    restart: unless-stopped
+    environment:
+      NIGHTWATCH_GRAPH_URL: http://guardroom:9999/api/graph
+      INVESTIGATOR_SOURCE_ID: guardroom
+      INVESTIGATOR_DB: /app/investigator/.data/investigator.sqlite3
+      INVESTIGATOR_POLL_SECONDS: "5"
+    volumes:
+      - investigator-state:/app/investigator/.data
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+    cpus: 0.5
+    pids_limit: 64
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9998/health/ready', timeout=2).read()"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 20s
+
 volumes:
   guardroom-state:
+  investigator-state:

@@ -1,12 +1,12 @@
 # Guard Room
 
-Guard Room 的 [backend](backend/README.md) 聚合 monitor 訊號、保存 graph 與調查資料，
-[frontend](frontend/README.md) 提供拓撲與調查工作台。`deploy/` 放部署檔，`configs/` 放拓撲設定。
+Guard Room 的 [backend](backend/README.md) 聚合 monitor 訊號、保存 graph，透過 HTTP 讀取獨立 Investigator 的偵測資料，
+[frontend](frontend/README.md) 提供拓撲與偵測工作台。`deploy/` 放部署檔，`configs/` 放拓撲設定。
 整套 Example Shop／Guard Room 可由 repo 根目錄 `./restart.sh` 啟動。
 
 ## Docker 操作與資料保存
 
-`./guardroom/deploy/restart.sh` 現在建置映像、驗證 config、重建容器並等待健康檢查。
+`./guardroom/deploy/restart.sh` 現在建置映像、驗證 config、重建 Guard Room／Investigator 兩個容器並等待健康檢查。
 映像使用鎖定的 server dependencies，不需 host 安裝 Python 或 uv。
 預設 Compose project 為 `nightwatch-guardroom`，不影響 shop-web 或其他 Compose project。
 
@@ -27,7 +27,9 @@ Client 與 HTTP monitor 若使用自訂 port，也須明確設定 URL。
 | --- | --- |
 | host `guardroom/configs/shop.json` → `/app/guardroom/configs/shop.json`，唯讀 | 拓撲與聚合設定；可用 `GUARDROOM_CONFIG` 指定其他 host config |
 | host `.run/monitor/` → `/app/.run/monitor/`，唯讀 | 共用 Shop 的 JSONL；可用 `MONITOR_LOG_DIR` 指定已存在的 host 目錄 |
-| named volume `nightwatch-guardroom_guardroom-state` → `/app/guardroom/.run/` | live checkpoint、歷史 snapshots、investigations.sqlite3 |
+| named volume `nightwatch-guardroom_guardroom-state` → `/app/guardroom/.run/` | live checkpoint、歷史 snapshots；舊 investigations.sqlite3 保留但不再讀取 |
+
+Investigator 使用獨立 named volume `nightwatch-guardroom_investigator-state` → `/app/investigator/.data/`，保存新的偵測 SQLite。Guard Room 不掛載該 volume。
 
 Config 在容器內的位置固定，相對路徑以 `/app/guardroom/configs/` 解析。自訂 config 建議保持
 `monitor_log=../../.run/monitor/monitor.jsonl`、`snapshot_path=../.run/...`、`history.directory=../.run/...`；
@@ -40,10 +42,7 @@ Config 修改後重啟。舊 host 程序及 `guardroom/.run/`、`guardroom/.data
 歷史快照仍依 retention 設定自動到期清理。不同 instance 可用不同的
 `GUARDROOM_PROJECT_NAME` 與 host port，避免共用 state volume。
 
-調查需要的 `NIGHTWATCH_LLM_API_KEY`／`OPENAI_API_KEY`、`NIGHTWATCH_LLM_MODEL` 等設定
-可透過 shell export 或 `guardroom/deploy/.env` 提供；不會自動載入 host 的 `investigator/.env`。
-預設 investigation graph URL 為容器內 `http://127.0.0.1:9999/api/graph`。
-不要將 API key 寫進 Dockerfile 或提交 `.env`。
+Guard Room 透過 `http://investigator:9998` 讀取偵測資料；Investigator 透過 `http://guardroom:9999/api/graph` 取得觀測。Investigator 不發布 host port，兩邊 readiness 不等待對方。沒有模型依賴或模型金鑰。
 
 容器以 UID 10001 非 root 執行，根檔案系統唯讀，僅 state volume 與 `/tmp` 可寫；
 停用額外 Linux capabilities、禁止權限提升，並限制 512 MiB 記憶體、1 CPU、128 processes。
@@ -54,7 +53,7 @@ Config 修改後重啟。舊 host 程序及 `guardroom/.run/`、`guardroom/.data
 Shop 節點 warning／failing 不會令 Guard Room unhealthy。
 Compose 每 5 秒探測一次；**unhealthy 本身不會觸發自動重啟**，此版未加入 autoheal。
 
-現有 Compose 未注入 `NIGHTWATCH_SHOP_URL`，修復工具預設關閉。容器內 localhost 不是 host 的 Shop；目前修復工具只允許本機 HTTP origin，不能直接改填其他容器名稱。本機 CLI／host server 的啟用方式見 [修復設計](../investigator/SYSTEM_DESIGN.md)。
+舊 AI loop、案例記憶與修復工具已移除；新版 Runner 尚未接入。詳見[服務設計](../investigator/SYSTEM_DESIGN.md)。
 
 ## 監測拓撲與故障判定
 
@@ -115,6 +114,6 @@ JSONL writer 使用 POSIX flock 協調本機多程序寫入，消費端等待完
 
 預設每 5 秒保存一張歷史 snapshot，保留 900 秒。`GET /api/graph/snapshots` 以 `limit`／`before_seq` 分頁，`GET /api/graph?timestamp=...` 讀不晚於指定時間的最後一張保留快照；找不到回 404。Graph 的 `at` 使用台灣時間 +08:00，Monitor 與 SSE `server_now` 使用 UTC。
 
-Console 透過調查 state／stream 取得 graph、歷史調查與報告，另以 `/events` 讀即時 log。Live `/events` 也包含相容舊畫面的 state／graph／incident；每 2 秒的 ping 含 `server_now`。Monitor log 不提供歷史續傳；調查串流有獨立 cursor。
+Console 透過 `/api/investigator/state` 與 `/api/investigator/stream` 取得本地 graph、偵測狀態與事件，歷史／詳情使用 `/api/detections`。另以 `/events` 讀即時 log；Monitor log 不提供歷史續傳，偵測事件使用持久化 cursor。
 
 HTTP 接收使用 `POST /api/logs`，格式以 [logs.py](backend/logs.py) 為準；不是 OTLP receiver。必須使用單一 uvicorn worker，不同 instance 不可共寫 state。API 無身分驗證，預設僅發布 localhost。詳細端點見 [server README](backend/README.md)，Monitor 使用方式見 [monitor README](../monitor/README.md)。

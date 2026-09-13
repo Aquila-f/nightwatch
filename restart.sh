@@ -143,15 +143,15 @@ if [[ "$console_ready" != true ]]; then
   printf 'Console startup failed; inspect %s.\n' "$console_log" >&2
   exit 1
 fi
-curl --fail --silent --show-error --max-time 8 "http://127.0.0.1:$console_port/api/investigations/state" >/dev/null
+curl --fail --silent --show-error --max-time 8 "http://127.0.0.1:$console_port/api/investigator/state" >/dev/null
 
 printf '\nAll services ready:\n'
 printf 'Shop:                  http://%s/\n' "$shop_frontend"
 printf 'Shop fault controls:   http://%s/#/events\n' "$shop_frontend"
 printf 'Console live graph:    http://127.0.0.1:%s/?source=live#topology\n' "$console_port"
-printf 'Investigation history: http://127.0.0.1:%s/?source=live#investigations\n' "$console_port"
+printf 'Detection history:     http://127.0.0.1:%s/?source=live#detections\n' "$console_port"
 printf 'Shop API docs:         http://%s/docs\n' "$shop_backend"
 printf 'Guard Room API docs:   http://%s/docs\n' "$guardroom"
 printf 'Graph JSON:            http://%s/api/graph\n' "$guardroom"
 printf 'Console log: %s (PID %s)\n' "$console_log" "$console_pid"
-guardroom_compose exec -T guardroom python -c 'import os; print("AI key: configured (not validated)" if os.getenv("NIGHTWATCH_LLM_API_KEY") or os.getenv("OPENAI_API_KEY") else "AI key: missing; monitoring works, but AI investigation needs a key in guardroom/deploy/.env")'
+printf 'Investigator: independent detection service; AI runner is not connected.\n'

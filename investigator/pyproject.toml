@@ -1,19 +1,18 @@
 [project]
-name = "nightwatch-agent"
-version = "0.1.0"
-description = "Minimal NightWatch investigation loop"
+name = "nightwatch-investigator"
+version = "0.2.0"
+description = "Independent graph observation and detection service"
 requires-python = ">=3.11"
 dependencies = [
-    "pydantic-ai-slim[openai]>=2.43,<3",
+    "fastapi>=0.115,<1",
+    "httpx>=0.27,<1",
+    "uvicorn>=0.30,<1",
     "jsonschema>=4.23,<5",
 ]
-
-[project.scripts]
-nightwatch-agent = "nightwatch_agent.__main__:main"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["nightwatch_agent"]
+packages = ["nightwatch_investigator"]

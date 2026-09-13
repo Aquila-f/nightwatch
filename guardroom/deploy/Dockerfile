@@ -7,10 +7,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     UV_LINK_MODE=copy \
     PATH="/app/guardroom/backend/.venv/bin:$PATH" \
-    GUARDROOM_CONFIG=/app/guardroom/configs/shop.json \
-    NIGHTWATCH_INVESTIGATION_DB=/app/guardroom/.run/investigations.sqlite3
+    GUARDROOM_CONFIG=/app/guardroom/configs/shop.json
 
-COPY investigator /app/investigator
 COPY guardroom/backend /app/guardroom/backend
 RUN uv sync --project /app/guardroom/backend --locked --no-dev --no-cache
 

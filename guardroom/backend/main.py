@@ -17,7 +17,7 @@ from graph_state import GraphStore
 from graph_history import TIMESTAMP_PATTERN, parse_timestamp
 
 from frontend_api import install_frontend
-from investigation_api import install_investigations
+from investigator_api import install_investigator
 
 
 class Trend(BaseModel):
@@ -181,7 +181,7 @@ async def get_graph(
 
 
 install_frontend(app, log_hub=log_hub)
-install_investigations(app)
+install_investigator(app)
 
 
 if __name__ == "__main__":

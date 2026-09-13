@@ -1,0 +1,16 @@
+**
+!investigator/
+!investigator/pyproject.toml
+!investigator/uv.lock
+!investigator/nightwatch_investigator/
+!investigator/nightwatch_investigator/*.py
+!contracts/
+!contracts/schemas/
+!contracts/schemas/**
+**/.venv
+**/.venv/**
+**/.env*
+**/.data
+**/.data/**
+**/__pycache__
+**/*.pyc

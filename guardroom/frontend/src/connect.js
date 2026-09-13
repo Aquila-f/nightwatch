@@ -1,5 +1,5 @@
 import {apiPath, readJSON, setMockMode, validateState, validateGraph} from './data.js';
-import {validateInvestigationState, validateObservation} from './investigation-data.js';
+import {validateWorkspaceState, validateObservation} from './investigation-data.js';
 
 const $ = id => document.getElementById(id);
 const shellQuote = value => "'" + value.replaceAll("'", "'\\''") + "'";
@@ -21,13 +21,13 @@ function startupCommand() {
 
 function checkStream(state, mock) {
   return new Promise((resolve, reject) => {
-    const events = new EventSource(mock ? apiPath('/events') : '/api/investigations/stream');
+    const events = new EventSource(mock ? apiPath('/events') : '/api/investigator/stream');
     let receivedState = false;
     const leave = () => finish(new Error('頁面已離開。'));
     const finish = error => { clearTimeout(timer); events.close(); window.removeEventListener('pagehide', leave); error ? reject(error) : resolve(); };
     const timer = setTimeout(() => finish(new Error('7 秒內未收到有效的 state 與 ping／graph。')), 7000);
     events.addEventListener('state', event => {
-      try { state = (mock ? validateState : validateInvestigationState)(JSON.parse(event.data)); receivedState = true; }
+      try { state = (mock ? validateState : validateWorkspaceState)(JSON.parse(event.data)); receivedState = true; }
       catch (error) { finish(error); }
     });
     for (const kind of ['ping', 'graph']) events.addEventListener(kind, event => {
@@ -71,14 +71,14 @@ export async function setupConnection(source) {
   $('check-connection').onclick = async () => {
     $('check-connection').disabled = true;
     const label = mock ? '本機模擬' : '目前伺服器';
-    const path = mock ? '/api/state' : '/api/investigations/state';
+    const path = mock ? '/api/state' : '/api/investigator/state';
     $('connection-check').textContent = `${label}：正在讀取 ${path}…`;
     try {
-      const state = (mock ? validateState : validateInvestigationState)(await readJSON(path));
+      const state = (mock ? validateState : validateWorkspaceState)(await readJSON(path));
       const nodes = mock ? state.graph_now.nodes.length : state.graph?.nodes.length;
       $('connection-check').textContent = `${label}：${nodes ?? '尚無'} 個節點。正在檢查推播…`;
       await checkStream(state, mock);
-      $('connection-check').textContent = `${label}：狀態與調查 SSE 接收成功。${mock ? '這不代表真實 shop 串接通過。' : state.graph_error ? `graph_error：${state.graph_error}` : '尚未驗證真實模型、graph 新量測或 Monitor log。'}`;
+      $('connection-check').textContent = `${label}：狀態與調查 SSE 接收成功。${mock ? '這不代表真實 shop 串接通過。' : !state.investigator.available ? 'Investigator 目前離線，graph 仍可使用。' : 'AI 調查尚未接入。'}`;
     } catch (error) {
       $('connection-check').textContent = `${label}檢查失敗：${error.message}`;
     } finally { $('check-connection').disabled = false; }

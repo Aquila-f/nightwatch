@@ -18,13 +18,15 @@
 
 ---
 
-NightWatch 是一個**協助調查服務異常的 AI Agent**。它把服務健康狀態、日誌與歷史快照串在一起，幫你理解發生了什麼、該往哪裡查、接下來能做什麼，並為調查結果留下證據。
+NightWatch 串起服務健康狀態、日誌與歷史快照。目前版本將 Guard Room 與獨立 Investigator 分離，由 Investigator 確認持續異常與恢復，Guard Room 提供前端資料。
 
-透過監測轉接與服務映射，可以將 NightWatch 接入既有系統。Agent 依據整理後的服務圖展開調查，同一套流程可延伸到不同應用與後端。這個 repository 以購物網站作為整合範例，串起商品、購物車、結帳與資料庫操作。
+AI loop 正在重寫，此版尚未接入。無需模型金鑰，手動 AI 調查、thinking、報告與修復目前不可用。詳見[目前架構](investigator/SYSTEM_DESIGN.md)。
+
+Repository 提供購物網站整合範例，涵蓋商品、購物車、結帳與資料庫操作。
 
 ## 運作方式
 
-用 12 秒看懂一次調查的流程。
+下方動畫是完整調查流程的概念示意；新版服務的 AI 調查與報告仍屬後續工作。
 
 <p align="center">
   <img src="docs/readme/nightwatch-workflow.gif" alt="NightWatch 運作流程：服務事件經 Monitor 與 Guard Room 整理，Agent 查閱服務圖、日誌與快照，產出包含發現、證據與下一步的報告。" width="100%">
@@ -39,31 +41,21 @@ NightWatch 是一個**協助調查服務異常的 AI Agent**。它把服務健�
 flowchart LR
     S["你的系統"] --> M["Monitor<br/>收集執行事件"]
     M --> G["Guard Room<br/>建立服務圖與快照"]
-    G --> A["AI Agent<br/>使用工具調查"]
-    A --> C["Console<br/>查看結果與證據"]
+    G --> I["Investigator<br/>Polling 與異常確認"]
+    I --> G
+    G --> C["Console<br/>拓樸與偵測紀錄"]
 ```
 
 </details>
 
 1. **收集觀測。** Monitor 記錄函式執行、耗時、日誌與例外，透過 JSONL 或 HTTP 傳送事件。
-2. **找出異常。** Guard Room 把事件對應到服務節點，計算健康指標並保存服務圖快照。持續出現的新異常可自動觸發調查，也能手動開始。
-3. **展開調查。** Agent 查看服務圖、比較歷史快照、讀取節點詳情與搜尋近期日誌，根據證據提出可能原因。
-4. **看懂結果。** Console 呈現服務圖與即時調查進度；發現、證據、模型對話與報告會保存下來，方便回看，也可透過 API 匯出。
-
-### 以結帳變慢為例
-
-一筆結帳請求比預期慢。Monitor 記錄這次呼叫的耗時與相關函式事件；達到設定門檻時，Guard Room 標示受影響節點。Agent 接著比較請求、結帳邏輯與資料庫的觀測，縮小延遲可能發生的位置，並在報告中說明證據支持的判斷與仍待確認的部分。
-
-| 你想知道…… | NightWatch 提供 |
-| --- | --- |
-| 該先看哪裡？ | 服務圖，以及已量測的健康狀態、流量、延遲與錯誤 |
-| 前後有什麼變化？ | 歷史服務圖快照與 Console 時間軸 |
-| Agent 為什麼這樣判斷？ | 工具結果、證據引用與保存的模型對話 |
-| 接下來能做什麼？ | 包含發現、假設、限制與下一步的結構化報告 |
+2. **整理觀測。** Guard Room 對應節點、計算健康指標並保存服務圖快照。
+3. **確認異常。** Investigator 定期讀取 graph，按節點獨立確認持續異常與恢復。
+4. **查看依據。** Console 只經由 Guard Room 取得偵測紀錄、觸發與恢復時的完整觀測。
 
 ## 接入你的系統
 
-對接的核心是**服務訊號與設定好的服務圖**。將 monitor 對應到服務節點後，Agent 就能透過相同的調查工具查詢 Guard Room。
+對接的核心是**服務訊號與設定好的服務圖**。將 monitor 對應到服務節點後，Investigator 透過 HTTP 讀取 Guard Room graph。
 
 - **Python 服務：** 用 `@monitor(MonitorConfig(...))` 標記需要觀測的函式，選擇 JSONL 或背景 HTTP 傳送。
 - **其他既有系統：** 實作轉接層，將事件轉成 `nightwatch.log.v1` 送到 `POST /api/logs`，並設定 `monitor_id` → 節點對應。
@@ -75,25 +67,25 @@ flowchart LR
 
 需要 Git、Docker + Compose、Python 3、curl 與 lsof。以下命令從 repository 根目錄執行：
 
-啟用 AI 調查時，請在**啟動前**於 shell 設定 `NIGHTWATCH_LLM_API_KEY`（或 `OPENAI_API_KEY`），也可放入 Git 忽略的 `guardroom/deploy/.env`。透過 `NIGHTWATCH_LLM_ENDPOINT` 與 `NIGHTWATCH_LLM_MODEL` 設定模型服務，詳見 [Agent 指南](investigator/README.md)。
+Compose 已包含獨立 Investigator。此版本不執行模型，不需要設定模型金鑰。
 
 ```sh
 git clone https://github.com/davidleitw/nightwatch-hack.git
 cd nightwatch-hack
 
-# 建置並啟動商店、Guard Room 與 Console。
+# 建置並啟動商店、Guard Room、Investigator 與 Console。
 ./restart.sh
 ```
 
-首次下載映像與安裝依賴可能需要網路；備妥後，本機監測服務可離線運作。AI 調查需要可連線的模型端點與金鑰。
+首次下載映像與安裝依賴可能需要網路；備妥後，本機監測服務可離線運作。異常偵測不依賴模型服務。
 
 | 開啟入口 | 預設網址 |
 | --- | --- |
-| Console — 服務圖與調查工作區 | http://127.0.0.1:4173 |
+| Console — 服務圖與偵測紀錄 | http://127.0.0.1:4173 |
 | 商店 — 產生服務活動 | http://127.0.0.1:8080 |
 | Guard Room — 互動式 API 文件 | http://127.0.0.1:9999/docs |
 
-瀏覽商品、操作結帳以產生觀測，再打開 Console 查看服務圖；設定好模型後，即可開始調查。
+瀏覽商品、操作結帳以產生觀測，再打開 Console 查看服務圖與偵測紀錄。
 
 ```sh
 # 確認服務可用，並取得目前服務圖。
@@ -115,8 +107,8 @@ curl --fail-with-body http://127.0.0.1:9999/api/graph
 | 元件 | 負責什麼 |
 | --- | --- |
 | [Monitor](monitor/README.md) | 收集函式事件並傳送至 Guard Room |
-| [Guard Room](guardroom/README.md) | 後端聚合與調查 API，以及 Web 操作介面 |
-| [AI Agent](investigator/README.md) | 使用工具調查，提交結構化報告 |
+| [Guard Room](guardroom/README.md) | 監測聚合與前端 API，以及 Web 操作介面 |
+| [Investigator](investigator/README.md) | 獨立觀測、異常確認與持久化偵測事件 |
 | [Example Shop](examples/shop/README.md) | 包含 gateway、catalog、cart、order 與前端的範例 workload |
 
 ## 接下來

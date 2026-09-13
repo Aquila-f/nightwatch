@@ -18,13 +18,15 @@
 
 ---
 
-NightWatch is an **AI agent for investigating service issues**. It connects service health, logs, and historical snapshots so you can understand what happened, where to look, and what to do next—with evidence behind the findings.
+NightWatch connects service health, logs, and historical snapshots. The current release separates Guard Room from an independent Investigator that confirms persistent anomalies and recovery.
 
-Connect it to your existing system through a monitoring adapter and service mapping. The agent investigates the resulting service graph, so the same workflow can extend across applications and backends. This repository includes a storefront spanning products, carts, checkout, and database operations as an integration example.
+The AI loop is being rewritten and is not connected in this release. No model key is needed; manual AI investigation, thinking, reports and repair are unavailable. See the [current architecture](investigator/SYSTEM_DESIGN.md).
+
+This repository includes a storefront integration example spanning products, carts, checkout, and database operations.
 
 ## How it works
 
-See the investigation flow in 12 seconds.
+The illustration below shows the broader investigation concept; AI investigation and reporting are future work in the rewritten service.
 
 <p align="center">
   <img src="docs/readme/nightwatch-workflow.gif" alt="NightWatch workflow: service events pass through Monitor and Guard Room; the agent reads the graph, logs, and snapshots to produce findings, evidence, and next steps." width="100%">
@@ -39,31 +41,21 @@ See the investigation flow in 12 seconds.
 flowchart LR
     S["Your system"] --> M["Monitor<br/>Collect execution events"]
     M --> G["Guard Room<br/>Build graph and snapshots"]
-    G --> A["AI Agent<br/>Investigate with tools"]
-    A --> C["Console<br/>Follow findings and evidence"]
+    G --> I["Investigator<br/>Poll and confirm anomalies"]
+    I --> G
+    G --> C["Console<br/>Graph and detection history"]
 ```
 
 </details>
 
 1. **Observe.** Monitor captures function execution, duration, logs, and exceptions, then sends events through JSONL or HTTP.
-2. **Find the signal.** Guard Room maps events to service nodes, calculates health indicators, and saves graph snapshots. Repeated fresh anomalies can trigger an investigation; you can also start one manually.
-3. **Investigate.** The agent inspects the graph, compares historical snapshots, reads node details, and searches recent logs to develop evidence-backed hypotheses.
-4. **Understand.** Console shows the service graph and streams investigation progress. Findings, supporting evidence, model conversations, and reports are saved for review; the API also supports export.
-
-### Follow a slow checkout
-
-A checkout request takes longer than expected. Monitor records the call duration and related function events. Guard Room marks affected nodes when configured thresholds are met. The agent can then compare the request, checkout logic, and database observations to narrow down where the delay occurred—and record what the evidence does and does not establish.
-
-| You want to know… | NightWatch provides |
-| --- | --- |
-| Where should I look first? | A service graph with health, traffic, latency, and errors where measured |
-| What changed? | Historical graph snapshots and a Console timeline |
-| Why does the agent think that? | Tool results, evidence references, and saved model conversations |
-| What should we do next? | A structured report with findings, hypotheses, limitations, and next steps |
+2. **Build observations.** Guard Room maps events to service nodes, calculates health indicators, and saves snapshots.
+3. **Confirm anomalies.** Investigator polls graph snapshots and independently confirms persistent anomalies and recovery for each node.
+4. **Review evidence.** Console reads Guard Room APIs to display detection history and the exact triggering/recovery observations.
 
 ## Connect your system
 
-The integration boundary is **service signals and a configured graph**. Map your monitors to service nodes, then let the agent query Guard Room through the same investigation tools.
+The integration boundary is **service signals and a configured graph**. Map your monitors to service nodes; Investigator reads the resulting graph through HTTP.
 
 - **Python services:** instrument selected functions with `@monitor(MonitorConfig(...))` and deliver events through JSONL or the background HTTP sink.
 - **Other systems:** implement an adapter that sends `nightwatch.log.v1` events to `POST /api/logs`, with a configured `monitor_id` → node mapping.
@@ -75,25 +67,25 @@ Start with the [Monitor guide](monitor/README.md), [graph configuration](guardro
 
 You need Git, Docker + Compose, Python 3, curl, and lsof. Run these commands from the repository root:
 
-To enable AI investigation, configure `NIGHTWATCH_LLM_API_KEY` (or `OPENAI_API_KEY`) in your shell **before starting**, or in the Git-ignored `guardroom/deploy/.env`. Set `NIGHTWATCH_LLM_ENDPOINT` and `NIGHTWATCH_LLM_MODEL` for your model provider; see the [Agent guide](investigator/README.md).
+The independent detection service is included in Compose. AI is not connected; model credentials are not used.
 
 ```sh
 git clone https://github.com/davidleitw/nightwatch-hack.git
 cd nightwatch-hack
 
-# Build and start the storefront, Guard Room, and Console.
+# Build and start the storefront, Guard Room, Investigator, and Console.
 ./restart.sh
 ```
 
-Initial image pulls and dependency installation may need network access. Once prepared, the local monitoring stack can run offline; AI investigation needs a reachable model endpoint and credentials.
+Initial image pulls and dependency installation may need network access. Once prepared, the local monitoring and detection stack can run offline.
 
 | Open | Default address |
 | --- | --- |
-| Console — service graph and investigations | http://127.0.0.1:4173 |
+| Console — service graph and detections | http://127.0.0.1:4173 |
 | Storefront — generate service activity | http://127.0.0.1:8080 |
 | Guard Room — interactive API docs | http://127.0.0.1:9999/docs |
 
-Browse products and use checkout to generate observations. Open Console to inspect the graph and start an investigation after configuring the model.
+Browse products and use checkout to generate observations. Open Console to inspect the graph and detection history.
 
 ```sh
 # Check service availability and the current graph.
@@ -115,12 +107,12 @@ The local storefront topology includes **18 operation nodes** across checkout, c
 | Component | Responsibility |
 | --- | --- |
 | [Monitor](monitor/README.md) | Capture function events and deliver them to Guard Room |
-| [Guard Room](guardroom/README.md) | Backend aggregation and investigation APIs plus the web console |
-| [AI Agent](investigator/README.md) | Investigate through tools and submit structured reports |
+| [Guard Room](guardroom/README.md) | Graph aggregation and browser-facing APIs plus the web console |
+| [Investigator](investigator/README.md) | Independent observation, anomaly confirmation and persistent detection events |
 | [Example Shop](examples/shop/README.md) | Example workload with gateway, catalog, cart, order, and frontend services |
 
 ## What's next
 
-Broader telemetry adapters, deeper service coverage, and human-approved repair with post-action verification. Today, the core workflow is **monitoring → investigation → report**. Coverage follows the configured instrumentation; missing measurements remain unknown. General automated repair is future work.
+Next: add a separate investigation manager and Runner behind the published service contract, then evidence and reports. Today the core workflow is **monitoring → detection → observation history**. Missing measurements remain unknown.
 
 <p align="center"><strong>From signals to understanding.</strong></p>
