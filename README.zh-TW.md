@@ -75,7 +75,7 @@ flowchart LR
 
 需要 Git、Docker + Compose、Python 3、curl 與 lsof。以下命令從 repository 根目錄執行：
 
-啟用 AI 調查時，請在**啟動前**於 shell 設定 `NIGHTWATCH_LLM_API_KEY`（或 `OPENAI_API_KEY`），也可放入 Git 忽略的 `guardroom/deploy/.env`。透過 `NIGHTWATCH_LLM_ENDPOINT` 與 `NIGHTWATCH_LLM_MODEL` 設定模型服務，詳見 [Agent 指南](investigation-agent/README.md)。
+啟用 AI 調查時，請在**啟動前**於 shell 設定 `NIGHTWATCH_LLM_API_KEY`（或 `OPENAI_API_KEY`），也可放入 Git 忽略的 `guardroom/deploy/.env`。透過 `NIGHTWATCH_LLM_ENDPOINT` 與 `NIGHTWATCH_LLM_MODEL` 設定模型服務，詳見 [Agent 指南](investigator/README.md)。
 
 ```sh
 git clone https://github.com/davidleitw/nightwatch-hack.git
@@ -116,7 +116,7 @@ curl --fail-with-body http://127.0.0.1:9999/api/graph
 | --- | --- |
 | [Monitor](monitor/README.md) | 收集函式事件並傳送至 Guard Room |
 | [Guard Room](guardroom/README.md) | 後端聚合與調查 API，以及 Web 操作介面 |
-| [AI Agent](investigation-agent/README.md) | 使用工具調查，提交結構化報告 |
+| [AI Agent](investigator/README.md) | 使用工具調查，提交結構化報告 |
 | [Example Shop](examples/shop/README.md) | 包含 gateway、catalog、cart、order 與前端的範例 workload |
 
 ## 接下來

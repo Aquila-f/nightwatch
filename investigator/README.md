@@ -1,4 +1,4 @@
-# NightWatch Investigation Agent
+# NightWatch Investigator
 
 `nightwatch_agent/` 使用 Guard Room API 執行調查。Guard Room backend 位於
 [`guardroom/backend/`](../guardroom/backend/)，Monitor SDK 位於 [`monitor/`](../monitor/)。
@@ -8,12 +8,12 @@
 依賴安裝好後，在 repo 根目錄執行：
 
 ```sh
-bash investigation-agent/run-agent.sh --describe-context
-bash investigation-agent/run-agent.sh --model
-bash investigation-agent/run-agent.sh --graph-url http://127.0.0.1:9999/api/graph --model
+bash investigator/run-agent.sh --describe-context
+bash investigator/run-agent.sh --model
+bash investigator/run-agent.sh --graph-url http://127.0.0.1:9999/api/graph --model
 ```
 
-`--describe-context` 只讀 graph 並列出 prompt／工具，不呼叫模型。`--model` 使用真實模型，需要模型服務可達與金鑰。腳本以 `uv run --locked --offline` 執行，依序選 `investigation-agent/.env` 或根目錄 `.env`，不安裝新依賴。
+`--describe-context` 只讀 graph 並列出 prompt／工具，不呼叫模型。`--model` 使用真實模型，需要模型服務可達與金鑰。腳本以 `uv run --locked --offline` 執行，依序選 `investigator/.env` 或根目錄 `.env`，不安裝新依賴。
 
 | 變數 | 行為 |
 | --- | --- |
@@ -37,8 +37,8 @@ bash investigation-agent/run-agent.sh --graph-url http://127.0.0.1:9999/api/grap
 ## 明確選用的離線資料
 
 ```sh
-bash investigation-agent/run-agent.sh --replay-model
-bash investigation-agent/run-agent.sh --fixture contracts/fixtures/catalog_pool_leak --model
+bash investigator/run-agent.sh --replay-model
+bash investigator/run-agent.sh --fixture contracts/fixtures/catalog_pool_leak --model
 ```
 
 `--replay-model` 使用腳本模型與錄影工具，完全離線；目前錄影缺少足夠 trace 證據，回 `unresolved`、exit 1。`--fixture --model` 使用真模型配錄影工具，不能算 live 資料驗證。
@@ -50,7 +50,7 @@ bash investigation-agent/run-agent.sh --fixture contracts/fixtures/catalog_pool_
 既有離線測試：
 
 ```sh
-PYTHONPATH=investigation-agent investigation-agent/.venv/bin/python -m unittest discover -s tests/investigation-agent -v
+PYTHONPATH=investigator investigator/.venv/bin/python -m unittest discover -s tests/investigator -v
 ```
 
 這些測試包含模型替身，通過不等於真實模型端到端驗證。Monitor 使用方式見 [Monitor README](../monitor/README.md)。

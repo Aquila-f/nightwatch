@@ -41,7 +41,7 @@ Config 修改後重啟。舊 host 程序及 `guardroom/.run/`、`guardroom/.data
 `GUARDROOM_PROJECT_NAME` 與 host port，避免共用 state volume。
 
 調查需要的 `NIGHTWATCH_LLM_API_KEY`／`OPENAI_API_KEY`、`NIGHTWATCH_LLM_MODEL` 等設定
-可透過 shell export 或 `guardroom/deploy/.env` 提供；不會自動載入 host 的 `investigation-agent/.env`。
+可透過 shell export 或 `guardroom/deploy/.env` 提供；不會自動載入 host 的 `investigator/.env`。
 預設 investigation graph URL 為容器內 `http://127.0.0.1:9999/api/graph`。
 不要將 API key 寫進 Dockerfile 或提交 `.env`。
 
@@ -54,7 +54,7 @@ Config 修改後重啟。舊 host 程序及 `guardroom/.run/`、`guardroom/.data
 Shop 節點 warning／failing 不會令 Guard Room unhealthy。
 Compose 每 5 秒探測一次；**unhealthy 本身不會觸發自動重啟**，此版未加入 autoheal。
 
-現有 Compose 未注入 `NIGHTWATCH_SHOP_URL`，修復工具預設關閉。容器內 localhost 不是 host 的 Shop；目前修復工具只允許本機 HTTP origin，不能直接改填其他容器名稱。本機 CLI／host server 的啟用方式見 [修復設計](../investigation-agent/SYSTEM_DESIGN.md)。
+現有 Compose 未注入 `NIGHTWATCH_SHOP_URL`，修復工具預設關閉。容器內 localhost 不是 host 的 Shop；目前修復工具只允許本機 HTTP origin，不能直接改填其他容器名稱。本機 CLI／host server 的啟用方式見 [修復設計](../investigator/SYSTEM_DESIGN.md)。
 
 ## 監測拓撲與故障判定
 

@@ -24,11 +24,11 @@ guardroom/backend/.venv/bin/python -m uvicorn main:app --app-dir guardroom/backe
 | `NIGHTWATCH_INVESTIGATION_DB` | 預設 `guardroom/.data/investigations.sqlite3`，另有排他鎖檔 |
 | `NIGHTWATCH_MOCK_DATA` | `0`（預設）或 `1`；只切換舊前端 API，不會將 investigation API 換成假模型 |
 
-可選 `NIGHTWATCH_SHOP_URL=http://127.0.0.1:8005`，授權 agent 解除該本機店面的演練故障；工具與驗證邊界見 [system design](../../investigation-agent/SYSTEM_DESIGN.md)。既有 `/api/faults*` 路由不因此啟用。
+可選 `NIGHTWATCH_SHOP_URL=http://127.0.0.1:8005`，授權 agent 解除該本機店面的演練故障；工具與驗證邊界見 [system design](../../investigator/SYSTEM_DESIGN.md)。既有 `/api/faults*` 路由不因此啟用。
 
 Compose 將調查 SQLite 放在 state volume 的 `/app/guardroom/.run/investigations.sqlite3`，重啟保留。Docker 內的 localhost 指容器自身，現有 Compose 未注入 `NIGHTWATCH_SHOP_URL`，修復工具預設關閉；啟用需另行設計符合本機 origin 限制的連線方式。
 
-模型設定見 [Investigation Agent README](../../investigation-agent/README.md)。server 不自行載入 dotenv；Compose 從 `guardroom/deploy/.env` 讀取並注入環境變數。`/docs`、`/openapi.json` 列出實際路由。
+模型設定見 [Investigator README](../../investigator/README.md)。server 不自行載入 dotenv；Compose 從 `guardroom/deploy/.env` 讀取並注入環境變數。`/docs`、`/openapi.json` 列出實際路由。
 
 ## 可用 API
 

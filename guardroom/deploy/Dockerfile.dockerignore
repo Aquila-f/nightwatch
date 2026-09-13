@@ -1,7 +1,7 @@
 # Only include runtime code, locked dependency metadata and schemas.
 **
-!investigation-agent/
-!investigation-agent/**
+!investigator/
+!investigator/**
 !guardroom/backend/
 !guardroom/backend/*.py
 !guardroom/backend/pyproject.toml

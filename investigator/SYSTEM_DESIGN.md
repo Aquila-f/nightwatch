@@ -48,13 +48,13 @@ OpenAI 官方 [Prompt caching](https://developers.openai.com/api/docs/guides/pro
 ## 實際觸發方式
 
 使用現有 server virtualenv，不新增依賴；由呼叫環境提供模型金鑰。設定
-`PYTHONPATH=investigation-agent:guardroom/backend` 後執行：
+`PYTHONPATH=investigator:guardroom/backend` 後執行：
 
 ```sh
 guardroom/backend/.venv/bin/python tests/acceptance/demo_repair.py \
   --shop-url http://127.0.0.1:8005 \
   --graph-url http://127.0.0.1:8004/api/graph \
-  --output /absolute/path/to/investigation-agent/.codex/repair-smoke
+  --output /absolute/path/to/investigator/.codex/repair-smoke
 ```
 
 腳本啟動隔離的 HTTP investigation service，使用真實 graph、店面與模型。對 checkout_exception、database_write_lock 各建立專用購物車，注入故障、確認結帳 5xx，再 POST 開案；要求歸檔有 agent 解除證據及尚有效租期，最後相同購物車結帳必須回 201。保存完整 export 與逐輪 cache usage。腳本會產生兩筆真實本機 demo 訂單，清除專用購物車與仍由此次注入的故障，停止驗證 server。此腳本驗證手動觸發，不代表店面 checkout 異常已被既有 monitor 拓樸完整捕捉或 detector 已驗證。

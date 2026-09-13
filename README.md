@@ -75,7 +75,7 @@ Start with the [Monitor guide](monitor/README.md), [graph configuration](guardro
 
 You need Git, Docker + Compose, Python 3, curl, and lsof. Run these commands from the repository root:
 
-To enable AI investigation, configure `NIGHTWATCH_LLM_API_KEY` (or `OPENAI_API_KEY`) in your shell **before starting**, or in the Git-ignored `guardroom/deploy/.env`. Set `NIGHTWATCH_LLM_ENDPOINT` and `NIGHTWATCH_LLM_MODEL` for your model provider; see the [Agent guide](investigation-agent/README.md).
+To enable AI investigation, configure `NIGHTWATCH_LLM_API_KEY` (or `OPENAI_API_KEY`) in your shell **before starting**, or in the Git-ignored `guardroom/deploy/.env`. Set `NIGHTWATCH_LLM_ENDPOINT` and `NIGHTWATCH_LLM_MODEL` for your model provider; see the [Agent guide](investigator/README.md).
 
 ```sh
 git clone https://github.com/davidleitw/nightwatch-hack.git
@@ -116,7 +116,7 @@ The local storefront topology includes **18 operation nodes** across checkout, c
 | --- | --- |
 | [Monitor](monitor/README.md) | Capture function events and deliver them to Guard Room |
 | [Guard Room](guardroom/README.md) | Backend aggregation and investigation APIs plus the web console |
-| [AI Agent](investigation-agent/README.md) | Investigate through tools and submit structured reports |
+| [AI Agent](investigator/README.md) | Investigate through tools and submit structured reports |
 | [Example Shop](examples/shop/README.md) | Example workload with gateway, catalog, cart, order, and frontend services |
 
 ## What's next

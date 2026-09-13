@@ -10,7 +10,7 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-nightwatch-agent = { path = "../../investigation-agent" }
+nightwatch-agent = { path = "../../investigator" }
 
 [dependency-groups]
 dev = ["httpx>=0.27,<1"]

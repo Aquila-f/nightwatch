@@ -459,7 +459,7 @@ wheels = [
 [[package]]
 name = "nightwatch-agent"
 version = "0.1.0"
-source = { directory = "../../investigation-agent" }
+source = { directory = "../../investigator" }
 dependencies = [
     { name = "jsonschema" },
     { name = "pydantic-ai-slim", extra = ["openai"] },
@@ -489,7 +489,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.115,<1" },
-    { name = "nightwatch-agent", directory = "../../investigation-agent" },
+    { name = "nightwatch-agent", directory = "../../investigator" },
     { name = "uvicorn", specifier = ">=0.30,<1" },
 ]
 
