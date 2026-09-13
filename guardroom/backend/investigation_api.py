@@ -38,7 +38,7 @@ CHAT_EVENTS = {"agent.output", "agent.thinking_summary", "agent.reasoning_status
 
 
 class InvestigationAPIError(APIError):
-    """Keeps the legacy frontend APIError handler and headers untouched."""
+    """Use the frontend API error shape and response headers."""
 
 
 class Trigger(BaseModel):
@@ -196,9 +196,8 @@ class InvestigationManager:
         self._started = False
         self._clients: list[Any] = []
         self._detector = GraphDetector()
-        # Operator-selected previews/history and mock UI mode are never inputs
-        # to automatic model calls. Manual investigation behavior is unchanged.
-        self._detection_enabled = not urlsplit(self.graph_url).query and os.getenv("NIGHTWATCH_MOCK_DATA") != "1"
+        # Operator-selected historical queries are never inputs to automatic model calls.
+        self._detection_enabled = not urlsplit(self.graph_url).query
 
     def _default_model(self):
         from openai import AsyncOpenAI

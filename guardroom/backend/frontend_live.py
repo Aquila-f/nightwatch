@@ -131,7 +131,7 @@ class LiveStore:
                 before = page["next_before"]
                 if before is None:
                     return result
-        if name in {"incident", "incident_events", "report", "snapshots", "timeline"}:
+        if name in {"incident", "incident_events", "snapshots"}:
             detail = self.investigations.detail(params["id"])
             if detail is None:
                 raise self.error(404, "not_found", "找不到這件調查")
@@ -156,10 +156,4 @@ class LiveStore:
                                           "from_t": seconds(start, detail["started_at"]),
                                           "to_t": seconds(end, detail["started_at"]), "count": len(snapshots)},
                         "snapshots": snapshots}
-            error = self.error(503, "internal", "尚無完整實驗報告所需的根因稽核、注入時刻、基線比較及修復驗證；請讀取已保存的調查報告")
-            error.body["error"]["details"] = {"report_url": f"/api/investigations/{detail['id']}/report"}
-            raise error
-        raise self.error(503, "internal", "尚未接入真實故障控制或修復服務")
-
-    def execute(self, *args):
-        raise self.error(503, "internal", "尚未接入真實故障控制或修復服務；沒有執行操作")
+        raise self.error(404, "not_found", "找不到資源")

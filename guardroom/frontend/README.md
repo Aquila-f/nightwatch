@@ -60,8 +60,6 @@ python3 guardroom/frontend/serve.py --port 4174 --mock
 
 任一靜態服務的 `/?source=recording` 會切到舊事故錄影。`app.js`、`data.js`、`incident-template.html` 與 `contracts/fixtures/catalog_pool_leak/` 仍支援這兩種明確選取的示範，因此保留。
 
-control 自己的 `NIGHTWATCH_MOCK_DATA=1` 是另一個獨立開關；它不等於 console 的 `--mock`。預設調查工作區不會因 control 的舊 state API 啟用 mock 就自動切換。
-
 ## 目前限制
 
 畫面沒有故障注入、批准修復、換輪或對話入口。獨立報告頁讀調查 detail／events／context；`snapshots`、`export` 專用端點尚無獨立匯出操作。

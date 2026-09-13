@@ -11,7 +11,6 @@ services:
       GUARDROOM_CONFIG: /app/guardroom/configs/shop.json
       NIGHTWATCH_INVESTIGATION_DB: /app/guardroom/.run/investigations.sqlite3
       NIGHTWATCH_GRAPH_URL: ${NIGHTWATCH_GRAPH_URL:-http://127.0.0.1:9999/api/graph}
-      NIGHTWATCH_MOCK_DATA: ${NIGHTWATCH_MOCK_DATA:-0}
       NIGHTWATCH_LLM_API_KEY: ${NIGHTWATCH_LLM_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       NIGHTWATCH_LLM_MODEL: ${NIGHTWATCH_LLM_MODEL:-gpt-6-astra}

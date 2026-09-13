@@ -1,4 +1,4 @@
-"""Config-driven graph snapshots from monitor logs, plus explicit mock previews."""
+"""Config-driven graph snapshots from monitor logs."""
 
 import asyncio
 from contextlib import asynccontextmanager, suppress
@@ -9,7 +9,7 @@ from time import monotonic
 from typing import Literal
 
 import uvicorn
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from logs import LogHub, create_log_router
@@ -72,52 +72,6 @@ class Graph(BaseModel):
     edges: list[Edge]
     sources: Sources = Field(default_factory=Sources)
     gap_before: None = None
-
-
-def dummy_graph(state: Literal["normal", "problem"] = "normal") -> Graph:
-    node_ids = [
-        "frontend-proxy", "frontend", "product-catalog", "cart", "checkout",
-        "payment", "recommendation", "email", "kafka", "fraud-detection",
-    ]
-    connections = [
-        ("frontend-proxy", "frontend", "calls"),
-        ("frontend", "product-catalog", "calls"),
-        ("frontend", "cart", "calls"),
-        ("frontend", "checkout", "calls"),
-        ("frontend", "recommendation", "calls"),
-        ("checkout", "payment", "calls"),
-        ("checkout", "email", "calls"),
-        ("checkout", "kafka", "publishes"),
-        ("fraud-detection", "kafka", "consumes"),
-    ]
-    graph = Graph(
-        nodes=[Node(id=node_id, kind="queue" if node_id == "kafka" else "service")
-               for node_id in node_ids],
-        edges=[Edge(**{"from": source, "to": target, "kind": kind})
-               for source, target, kind in connections],
-    )
-    if state == "problem":
-        for node in graph.nodes:
-            if node.id == "payment":
-                node.status = "failing"
-                node.assessment = "origin"
-                node.errors = 0.8
-                node.p95_ms = 3000.0
-                node.saturation = 0.95
-                node.trend = Trend(errors="rising", latency="rising", saturation="rising")
-            elif node.id in {"checkout", "frontend"}:
-                node.status = "warning"
-                node.assessment = "suspect"
-                node.errors = 0.3
-                node.p95_ms = 1500.0
-                node.trend = Trend(errors="rising", latency="rising")
-        for edge in graph.edges:
-            if (edge.source, edge.to) in {
-                ("checkout", "payment"), ("frontend", "checkout"),
-            }:
-                edge.errors = 0.8 if edge.to == "payment" else 0.3
-                edge.p95_ms = 3000.0 if edge.to == "payment" else 1500.0
-    return graph
 
 
 @asynccontextmanager
@@ -205,18 +159,16 @@ async def list_graph_snapshots(
 
 @app.get("/api/graph", response_model=Graph, summary="Get current or historical monitor graph snapshot")
 async def get_graph(
-    state: Literal["normal", "problem"] | None = Query(
-        default=None, description="Optional explicit dummy preview; omitted returns the live snapshot."
-    ),
+    request: Request,
     timestamp: str | None = Query(
         default=None, pattern=TIMESTAMP_PATTERN,
         description="RFC3339 with timezone, e.g. 2026-09-12T13:00:00+08:00. Return the last archived snapshot at or before this time.",
     ),
 ) -> Graph:
     """Read stored graph content without recomputing historical state."""
+    if set(request.query_params) - {"timestamp"} or len(request.query_params.getlist("timestamp")) > 1:
+        raise HTTPException(422, detail="Only one timestamp query parameter is supported")
     if timestamp is not None:
-        if state is not None:
-            raise HTTPException(422, detail="timestamp and state cannot be combined")
         try:
             requested = parse_timestamp(timestamp)
         except ValueError as exc:
@@ -225,10 +177,10 @@ async def get_graph(
         if snapshot is None:
             raise HTTPException(404, detail={"code": "snapshot_not_found", "message": "沒有不晚於指定時間的保留快照"})
         return Graph.model_validate(snapshot)
-    return dummy_graph(state) if state is not None else Graph.model_validate(app.state.graph_store.snapshot)
+    return Graph.model_validate(app.state.graph_store.snapshot)
 
 
-install_frontend(app, graph_provider=dummy_graph, log_hub=log_hub)
+install_frontend(app, log_hub=log_hub)
 install_investigations(app)
 
 

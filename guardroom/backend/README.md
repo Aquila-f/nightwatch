@@ -1,6 +1,6 @@
 # Guard Room HTTP server
 
-程式入口是 `main:app`。目前預設提供真實 monitor graph、日誌、快照歷史與 SQLite 調查。mock 必須明確設定 `NIGHTWATCH_MOCK_DATA=1`。
+程式入口是 `main:app`，提供真實 monitor graph、日誌、快照歷史與 SQLite 調查。
 
 ## 啟動
 
@@ -22,9 +22,8 @@ guardroom/backend/.venv/bin/python -m uvicorn main:app --app-dir guardroom/backe
 | `GUARDROOM_CONFIG` | 預設 `guardroom/configs/shop.json`；控制 monitor→node 對應與保存路徑 |
 | `NIGHTWATCH_GRAPH_URL` | 調查用來源，預設 `http://127.0.0.1:9999/api/graph`；改 server 埠時同步設定 |
 | `NIGHTWATCH_INVESTIGATION_DB` | 預設 `guardroom/.data/investigations.sqlite3`，另有排他鎖檔 |
-| `NIGHTWATCH_MOCK_DATA` | `0`（預設）或 `1`；只切換舊前端 API，不會將 investigation API 換成假模型 |
 
-可選 `NIGHTWATCH_SHOP_URL=http://127.0.0.1:8005`，授權 agent 解除該本機店面的演練故障；工具與驗證邊界見 [system design](../../investigator/SYSTEM_DESIGN.md)。既有 `/api/faults*` 路由不因此啟用。
+可選 `NIGHTWATCH_SHOP_URL=http://127.0.0.1:8005`，授權 agent 解除該本機店面的演練故障；工具與驗證邊界見 [system design](../../investigator/SYSTEM_DESIGN.md)。
 
 Compose 將調查 SQLite 放在 state volume 的 `/app/guardroom/.run/investigations.sqlite3`，重啟保留。Docker 內的 localhost 指容器自身，現有 Compose 未注入 `NIGHTWATCH_SHOP_URL`，修復工具預設關閉；啟用需另行設計符合本機 origin 限制的連線方式。
 
@@ -36,7 +35,7 @@ Compose 將調查 SQLite 放在 state volume 的 `/app/guardroom/.run/investigat
 | --- | --- |
 | `GET /health` | HTTP 服務存活 |
 | `GET /health/ready` | snapshot 與歷史排程就緒；獨立於被監控節點的健康 |
-| `GET /api/graph` | 最新真實快照；`timestamp` 讀歷史，`state=normal/problem` 明確讀假圖 |
+| `GET /api/graph` | 最新真實快照；`timestamp` 讀歷史 |
 | `GET /api/graph/snapshots` | `limit`、`before_seq` 分頁列出保留快照 |
 | `POST /api/logs` | 接收 `nightwatch.log.v1` 日誌，去重、保存並推播 |
 | `GET /api/debug/logs` | `service`、`limit` 查最新保留日誌 |
@@ -59,11 +58,7 @@ Compose 將調查 SQLite 放在 state volume 的 `/app/guardroom/.run/investigat
 
 每 5 秒刷新 graph；同一節點連續三次符合新鮮度條件的 warning／failing 才開調查。SQLite 保存異常旗標，避免同一段異常重複開案；確認恢復且沒有執行中調查才解除。舊／重複快照與來源失敗打斷累計。
 
-Graph URL 帶 query 或 `NIGHTWATCH_MOCK_DATA=1` 時停用自動偵測。這只停用自動觸發，手動建立調查仍使用設定的模型。Prometheus／Jaeger 不是目前 detector 的資料源。
-
-## 尚未實作
-
-`/api/faults*`、換輪、操作進度、批准與中止只有 mock 實作，live 回 503。舊 `/api/incidents/{id}/report`、`timeline` 缺完整修復稽核，live 回 503；應讀 `/api/investigations/{id}/report`。
+Graph URL 帶 query 時停用自動偵測，避免把歷史查詢送入自動模型呼叫。這只停用自動觸發，手動建立調查仍使用設定的模型。Prometheus／Jaeger 不是目前 detector 的資料源。
 
 ## 調查對話事件
 
